@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./debate_system/app"
+    ]
+}

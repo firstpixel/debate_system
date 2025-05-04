@@ -1,0 +1,55 @@
+{
+  "log": [
+    {
+      "agent": "VisionaryAI",
+      "duration_sec": 8.392
+    },
+    {
+      "agent": "EngineerAI",
+      "duration_sec": 9.108
+    },
+    {
+      "agent": "EconoLogix",
+      "duration_sec": 9.436
+    },
+    {
+      "agent": "CivEthica",
+      "duration_sec": 7.888
+    },
+    {
+      "agent": "MetaCogito",
+      "duration_sec": 8.137
+    },
+    {
+      "agent": "VisionaryAI",
+      "duration_sec": 9.843
+    },
+    {
+      "agent": "EngineerAI",
+      "duration_sec": 8.204
+    },
+    {
+      "agent": "EconoLogix",
+      "duration_sec": 10.025
+    },
+    {
+      "agent": "CivEthica",
+      "duration_sec": 9.172
+    },
+    {
+      "agent": "MetaCogito",
+      "duration_sec": 9.766
+    }
+  ],
+  "summary": {
+    "per_agent_avg_time": {
+      "VisionaryAI": 9.117,
+      "EngineerAI": 8.656,
+      "EconoLogix": 9.73,
+      "CivEthica": 8.53,
+      "MetaCogito": 8.951
+    },
+    "total_turns": 10,
+    "total_time_sec": 89.971
+  }
+}

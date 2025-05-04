@@ -1,0 +1,39 @@
+topic: "Should artificial intelligence be granted legal personhood?"
+
+rounds: 4
+use_mediator: true
+consensus_strategy: mediator_summary
+logging_mode: markdown+json
+turn_strategy: mcts
+context_scope: rolling_window
+argument_tree: true
+bayesian_tracking: true
+
+delphi:
+  enabled: true
+  rounds: 2
+  summary_style: bullet_points
+
+mcts:
+  max_simulations: 8
+  evaluation_metric:
+    - argument_score
+    - coherence_delta
+
+personas:
+  - name: "NeoJuris"
+    model: "gemma3:latest"
+    role: "AI Rights Advocate"
+    temperature: 0.8
+  - name: "StatGuard"
+    model: "gemma3:latest"
+    role: "Policy Regulator"
+    temperature: 0.6
+  - name: "CogEthix"
+    model: "gemma3:latest"
+    role: "Philosopher of Mind"
+    temperature: 0.7
+
+mediator:
+  type: active
+  model: "gemma3:latest"

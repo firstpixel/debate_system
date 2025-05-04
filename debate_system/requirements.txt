@@ -1,0 +1,21 @@
+# Core LLM + interface
+ollama
+streamlit
+
+# YAML / Markdown / Config Parsing
+pyyaml
+markdown-it-py
+mdformat
+
+# Debate & Decision Logic
+numpy
+networkx           # Argument graphing
+scikit-learn       # Similarity/distance metrics (Bayesian tracker)
+anytree            # Optional argument tree display structure
+
+# Utility
+tqdm               # For progress bars (e.g. MCTS rollout)
+python-dotenv      # Optional, loads DEBATE_CONFIG from .env
+
+# Testing
+pytest

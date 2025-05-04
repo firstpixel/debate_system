@@ -1,0 +1,3 @@
+- AI deserves recognition when demonstrating coherent decision-making.
+- I advocate for tiered rights, not full personhood.
+- Intelligence is not the same as sentience, but it's a precursor.

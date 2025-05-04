@@ -1,0 +1,24 @@
+topic: "Should we limit AI autonomy?"
+
+rounds: 2
+use_mediator: false
+consensus_strategy: agent_closing
+logging_mode: markdown
+turn_strategy: round_robin
+context_scope: rolling
+argument_tree: true
+bayesian_tracking: false
+
+personas:
+  - name: "Alpha"
+    model: "gemma3:latest"
+    role: "Pro-Autonomy Advocate"
+    temperature: 0.7
+  - name: "Beta"
+    model: "gemma3:latest"
+    role: "AI Skeptic"
+    temperature: 0.7
+
+mediator:
+  type: silent
+  model: "gemma3:latest"

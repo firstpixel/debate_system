@@ -1,0 +1,49 @@
+topic: "Should artificial general intelligence (AGI) be open-sourced to the public?"
+
+rounds: 2
+use_mediator: true
+consensus_strategy: vote
+logging_mode: markdown
+turn_strategy: priority
+context_scope: rolling
+argument_tree: true
+bayesian_tracking: true
+
+delphi:
+  enabled: true
+  rounds: 1
+  summary_style: bullet_points
+
+mcts:
+  max_simulations: 15
+  evaluation_metric:
+    - argument_score
+    - coherence_delta
+    - topic_drift_penalty
+
+personas:
+  - name: "VisionaryAI"
+    model: "gemma3:latest"
+    role: "Utopian Technologist"
+    temperature: 0.9
+  - name: "EngineerAI"
+    model: "gemma3:latest"
+    role: "AI Software engineer"
+    temperature: 0.1
+  - name: "EconoLogix"
+    model: "gemma3:latest"
+    role: "Capitalist Economist"
+    temperature: 0.7
+  - name: "CivEthica"
+    model: "gemma3:latest"
+    role: "Ethics Professor"
+    temperature: 0.65
+  - name: "MetaCogito"
+    model: "gemma3:latest"
+    role: "AI Philosophy Researcher"
+    temperature: 0.95
+
+mediator:
+  type: active
+  model: "gemma3:latest"
+
