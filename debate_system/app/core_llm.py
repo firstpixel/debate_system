@@ -5,7 +5,7 @@ import logging
 from ollama import Client
 from typing import List, Dict, Generator
 
-logger = logging.getLogger(__name__)
+
 
 class LLMClient:
     def __init__(self, model: str = "gemma3:latest", temperature: float = 0.7):
@@ -14,7 +14,7 @@ class LLMClient:
         self.client = Client()
 
     def chat(self, messages: List[Dict]) -> str:
-        logger.info(f"###########Chatting with model {self.model}...") # Use the logger instance
+        print(f"###########Chatting with model {messages}...") # Use the logger instance
        
         response = self.client.chat(
             model=self.model,
@@ -23,17 +23,18 @@ class LLMClient:
             options={
                 "temperature": self.temperature,
                 "top_p": 0.7,
-                "frequency_penalty": 0.0,
-                "presence_penalty": 0.0,
-                "num_predict": 256,
-                "num_gpu": 1, 
-                "num_ctx": 64000,
+                "frequency_penalty": 0.1,
+                "presence_penalty": 0.2,
+                "num_predict": 512,
+                # "num_gpu": 1,  # Ensure we use GPU
+                # "num_ctx": 4096,
+                "mmap": True,  # Enable memory mapping for better performance
             }
         )
         return response["message"]["content"]
 
     def stream_chat(self, messages: List[Dict]) -> Generator[str, None, None]:
-        logger.info(f"###########Streaming chat with model: {self.model}") # Use the logger instance
+        print(f"###########Streaming chat with model: {messages}") # Use the logger instance
         stream = self.client.chat(
             model=self.model,
             messages=messages,
@@ -41,18 +42,24 @@ class LLMClient:
             options={
                 "temperature": self.temperature,
                 "top_p": 0.9,
-                "frequency_penalty": 0.0,
-                "presence_penalty": 0.0,
-                "num_predict": 512
+                "frequency_penalty": 0.1,
+                "presence_penalty": 0.2,
+                "num_predict": 512,
+                # "num_gpu": 1,  # Ensure we use GPU
+                # "num_ctx": 4096,
+                "mmap": True,  # Enable memory mapping for better performance
             }
         )
         for part in stream:
             yield part["message"]["content"]
 
     def embed(self, text: str) -> List[float]:
-            logger.info("###########Embedding with model: nomic-embed-text:latest")
+            print(f"###########Embedding with model: {text}") 
             result = self.client.embeddings(
                 model="nomic-embed-text:latest",
-                prompt=text
+                prompt=text,
+                # options={
+                #     "num_gpu": 1  # Ensure embeddings also use GPU
+                # }
             )
             return result["embedding"]

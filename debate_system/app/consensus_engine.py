@@ -17,6 +17,9 @@ class ConsensusEngine:
         transcript: List[Dict],
         graph: ArgumentGraph
     ) -> str:
+        
+        print(f"Generating consensus using strategy: {self.strategy}")
+        
         if self.strategy == "no_consensus":
             return "❗ No consensus was reached. Each agent retains their position."
 
@@ -47,9 +50,8 @@ class ConsensusEngine:
             {"role": "user", "content": f"Debate Transcript:\n\n{debate_text}"}
         ]
 
-        result = ""
-        for token in self.llm.stream_chat(prompt):
-            result += token
+        # Replace streaming with non-streaming call since this is only shown at the end of the debate
+        result = self.llm.chat(prompt)
         return f"### 🤝 Consensus Summary:\n{result.strip()}"
 
     def _agent_vote_summary(self, agent_states: Dict[str, AgentStateTracker]) -> str:
@@ -59,7 +61,6 @@ class ConsensusEngine:
             {"role": "user", "content": "\n\n".join(f"- {b}" for b in beliefs)}
         ]
 
-        result = ""
-        for token in self.llm.stream_chat(prompt):
-            result += token
+        # Replace streaming with non-streaming call since this is only shown at the end of the debate
+        result = self.llm.chat(prompt)
         return f"### 🗳️ Voting Result:\n{result.strip()}"

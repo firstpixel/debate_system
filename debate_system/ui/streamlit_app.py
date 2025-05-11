@@ -47,25 +47,69 @@ if st.session_state.cfg_text:
             # Display the topic
             topic = dm.config.get("topic", "No Topic Specified")
             st.subheader(f"📜 Debate Topic: {topic}")
-            feedback_box = st.empty()
-            feedback_buffer = {"current_agent": None, "text": ""}
-
+            
+            # Create a container for all feedback
+            feedback_container = st.container()
+            # Track messages chronologically
+            messages_chronological = []
+            
             def stream_feedback(agent_name: str, current_message_chunk: str):
-                debug_chunk_preview = current_message_chunk[:100].replace('\\n', ' ')
-                print(f"DEBUG UI Callback: Agent='{agent_name}', Chunk='{debug_chunk_preview}...'")
-
-                if agent_name != feedback_buffer["current_agent"]:
-                    feedback_buffer["current_agent"] = agent_name
-                    feedback_buffer["text"] = current_message_chunk
+                # If this is a new message (first chunk), add it to our chronological list
+                if agent_name not in st.session_state.get("current_speakers", set()):
+                    # Track that this agent is now speaking
+                    if "current_speakers" not in st.session_state:
+                        st.session_state.current_speakers = set()
+                    
+                    st.session_state.current_speakers.add(agent_name)
+                    
+                    # Create a new message entry
+                    message_index = len(messages_chronological)
+                    messages_chronological.append({
+                        "agent": agent_name,
+                        "text": current_message_chunk,
+                        "box": feedback_container.empty()
+                    })
                 else:
-                    feedback_buffer["text"] += current_message_chunk
-
-                feedback_box.markdown(f'🗣️ **{feedback_buffer["current_agent"]}:** {feedback_buffer["text"]}▌')
+                    # Find the most recent message from this agent
+                    for message in reversed(messages_chronological):
+                        if message["agent"] == agent_name:
+                            message["text"] += current_message_chunk
+                            break
+                
+                # Clear speakers set when an agent finishes (this assumes chunks come in sequence)
+                if agent_name == "Delphi" or agent_name == "Final Consensus" or agent_name == "Audit Report":
+                    # Reset speakers after Delphi/final outputs which mark end of a phase
+                    st.session_state.current_speakers = set()
+                
+                # Update the UI for this message
+                for message in messages_chronological:
+                    # Apply special formatting based on agent type
+                    if message["agent"] == "Round_Marker":
+                        # For round markers, use distinct styling with dividers
+                        message["box"].markdown(f'<div style="text-align:center; margin:20px 0; border-top:1px solid #ddd; border-bottom:1px solid #ddd; padding:8px 0;">{message["text"]}</div>', unsafe_allow_html=True)
+                    elif message["agent"] == "Delphi":
+                        prefix = "🧠 **Delphi Synthesis (Round " + str(len(st.session_state.get("completed_rounds", [])) + 1) + ")**:"
+                        message["box"].markdown(f'{prefix} {message["text"]}▌')
+                    elif message["agent"] == "Mediator":
+                        prefix = "🧑‍⚖️ **Mediator**:"
+                        message["box"].markdown(f'{prefix} {message["text"]}▌')
+                    elif message["agent"] == "Final Consensus":
+                        prefix = "✅ **Final Consensus**:"
+                        message["box"].markdown(f'{prefix} {message["text"]}▌')
+                    elif message["agent"] == "Audit Report":
+                        prefix = "📋 **Audit Report**:"
+                        message["box"].markdown(f'{prefix} {message["text"]}▌')
+                    else:
+                        prefix = f'🗣️ **{message["agent"]}**:'
+                        message["box"].markdown(f'{prefix} {message["text"]}▌')
+                
+                # Track completed rounds when Delphi speaks
+                if agent_name == "Delphi":
+                    if "completed_rounds" not in st.session_state:
+                        st.session_state.completed_rounds = []
+                    st.session_state.completed_rounds.append(True)
 
             dm.start(feedback_callback=stream_feedback)
-
-            # Clear the feedback box after the debate finishes
-            feedback_box.empty()
 
             # Store results after debate ends
             st.session_state.debate_complete = True

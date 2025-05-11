@@ -15,6 +15,9 @@ from app.context_builder import ContextBuilder
 from app.bayesian_tracker import BayesianTracker
 from app.final_tester_agent import FinalTesterAgent
 from app.delphi_engine import DelphiEngine
+from app.mediator_agent import MediatorAgent
+from app.contradiction_detector import ContradictionDetector
+from app.discussion_lens import DiscussionLens
 
 class DebateManager:
     def __init__(self, config: dict):
@@ -27,6 +30,19 @@ class DebateManager:
         self.tracker = BayesianTracker()
         self.contradiction_log = ContradictionLog()
         self.delphi_engine = DelphiEngine()
+        self.contradiction_detector = ContradictionDetector()
+        
+        # Initialize mediator if enabled
+        mediator_config = self.config.get("mediator", {})
+        self.use_mediator = self.config.get("use_mediator", False)
+        if self.use_mediator:
+            self.mediator = MediatorAgent(
+                mode=mediator_config.get("type", "active"),
+                model=mediator_config.get("model", "gemma3:latest"),
+                temperature=mediator_config.get("temperature", 0.5)
+            )
+        else:
+            self.mediator = None
 
         # Shared context builder for all agents
         self.context_builder = ContextBuilder(
@@ -35,8 +51,9 @@ class DebateManager:
             window_size=config.get("window_size", 10),
         )
 
-        # Initialize agents based on config
         self.agents = []
+        self.agent_trackers = {}
+
         for persona in self.config.get("personas", []):
             agent = PersonaAgent(
                 name=persona["name"],
@@ -44,11 +61,16 @@ class DebateManager:
                 temperature=persona.get("temperature", 0.7),
                 model=persona.get("model", "gemma3:latest"),
             )
+            self.agents.append(agent)
+            self.agent_trackers[agent.name] = agent.tracker
+
+        # Now safe to initialize BayesianTracker with all trackers
+        self.tracker = BayesianTracker(agent_trackers=self.agent_trackers)
+
+        # Attach tracker/log after it's fully constructed
+        for agent in self.agents:
             agent.bayesian_tracker = self.tracker
             agent.contradiction_log = self.contradiction_log
-            agent.perf_logger = self.performance_logger
-            agent.context_builder = self.context_builder
-            self.agents.append(agent)
 
         self.flow_controller = FlowController(
             agent_names=[agent.name for agent in self.agents],
@@ -66,6 +88,10 @@ class DebateManager:
 
         for round_num in range(rounds):
             print(f"\n🔁 Round {round_num + 1} / {rounds}")
+            
+            # Send round information to UI
+            if feedback_callback:
+                feedback_callback("Round_Marker", f"## 🔁 Round {round_num + 1} / {rounds}")
 
             for _ in range(len(self.agents)):
                 # FlowController determines next agent
@@ -73,29 +99,84 @@ class DebateManager:
                     "round": round_num,
                     "history": self.debate_history
                 })
+                print(f"DEBUG Manager: Round={round_num+1}, Selected Agent by FlowController='{selected_name}'")
 
-                self.flow_controller.update_scores(self.tracker.get_scores())
+                # Always get the agent object before attempting to find an opponent
                 agent = next(a for a in self.agents if a.name == selected_name)
+                
+                # Update priority scores before next agent selection if using priority strategy
+                if self.config.get("turn_strategy") == "priority":
+                    print(f"Using priority strategy. Current scores: {self.tracker.get_scores()}")
+                    self.flow_controller.update_scores(self.tracker.get_scores())
+                    print(f"Updated priority order: {self.flow_controller._priority_order}")
 
+                # Track which agents have spoken in this round to avoid duplicates
+                if not hasattr(self, '_round_speakers'):
+                    self._round_speakers = set()
+                
+                # Skip if this agent has already spoken in this round
+                if selected_name in self._round_speakers:
+                    print(f"DEBUG Manager: Skipping {selected_name} as they already spoke in Round {round_num+1}")
+                    continue
+                    
+                # Add agent to speakers for this round
+                self._round_speakers.add(selected_name)
+                
+                # Reset speakers at the end of the round
+                if len(self._round_speakers) >= len(self.agents):
+                    self._round_speakers = set()
+                
                 # Fetch opponent's last statement
                 opponent = next((a for a in self.agents if a.name != agent.name), None)
                 opponent_last = next(
-                    (r["content"] for r in reversed(self.debate_history) if r["agent"] == opponent.name),
-                    "" if opponent else ""
+                    (r["content"] for r in reversed(self.debate_history) if r["agent"] == (opponent.name if opponent else "")),
+                    ""
                 )
 
+
                 topic = self.config.get("topic", "")
-                #prompt = f"{topic} Round {round_num + 1}, your turn:"
-                delphi_comment = next((r["content"] for r in reversed(self.debate_history) if r["agent"] == "Delphi"), "")
-                prompt = f"Topic: {topic} \n\nRound {round_num + 1}, your turn: {agent.name}\n\n🧠 Delphi Summary:\n{delphi_comment.strip()}"
+                if(round_num == 0):
+                    prompt = f"{topic} Round {round_num + 1}, your turn:"
+                else:
+                     # Sugestion themes
+                     
+                    rnd=round_num 
+                    try:
+                        idx = rnd - 3
+                        if idx < 1 or idx > 30:
+                            theme = None
+                            print(f"Round {idx:2d} theme is not defined. Using free theme.")
+                        else:
+                            print(f"Round {idx:2d}: {DiscussionLens.get_theme(idx)}")
+                            theme = f"Please consider this perspective or lens: {DiscussionLens.get_theme(idx)} \n"
+                    except ValueError as e:
+                        theme = None
+                        print(f"Round {idx:2d}: {e}")
+                    
+                    
+                    delphi_comment = next((r["content"] for r in reversed(self.debate_history) if r["agent"] == "Delphi"), "")
+                    prompt = f"Topic: {topic}"
+                    if theme != None:
+                        prompt += f"\n\n{theme}"
+                    prompt +=f" \n\nRound {round_num + 1}, your turn: {agent.name}\n\n🧠 Delphi Summary:\n{delphi_comment.strip()}"
+                
+                
                 
                 response = ""
                 
+                # Capture the current agent's name for the callback
+                current_agent_name = agent.name
+                
+                # Define stream callback that passes both agent name and token
                 def stream_to_ui(token):
                     nonlocal response
                     response += token
                     if feedback_callback:
-                        feedback_callback(token)
+                        feedback_callback(current_agent_name, token)
+                        
+                print(f"Agent {agent.name} is interacting with prompt: {prompt}")
+                print(f"Opponent's last statement: {opponent_last}")
+                print(f"Debate history: {self.debate_history}")
                     
                 response = agent.interact(
                     user_prompt=prompt,
@@ -106,11 +187,12 @@ class DebateManager:
                 )
 
                 # Realtime feedback to Streamlit
-                if feedback_callback:
-                    feedback_callback(f"#### {agent.name} says:\n{response}")
+                #if feedback_callback:
+                #    feedback_callback(f"#### {agent.name} says:\n{response}")
                     
                 
 
+                # Track this agent's turn for conflict detection later
                 self.tracker.track_turn(agent=agent.name, message=response, topic=topic)
 
                 self.debate_history.append({
@@ -121,28 +203,84 @@ class DebateManager:
                 })
 
                 self.argument_graph.add_argument(agent.name, response)
+                
+                # Check if mediator should intervene after this agent's turn
+                if self.use_mediator and self.mediator and len(self.debate_history) > 1:
+                    should_intervene = False
+                    mediator_mode = self.mediator.mode
+                    intervention_reason = ""
+                    
+                    # For "active" mode: Check for contradictions between agents using the contradiction detector
+                    if mediator_mode == "active" and opponent:
+                        # Get the last few statements from each agent in this round
+                        agent_statements = [r["content"] for r in self.debate_history 
+                                       if r["agent"] == agent.name and r["round"] == round_num + 1]
+                        opponent_statements = [r["content"] for r in self.debate_history 
+                                           if r["agent"] == opponent.name and r["round"] == round_num + 1]
+                        
+                        # Use contradiction detector to identify actual contradictions
+                        if agent_statements and opponent_statements:
+                            contradictions = self.contradiction_detector.find_contradictions(
+                                agent_statements[-1], opponent_statements
+                            )
+                            
+                            if contradictions:
+                                should_intervene = True
+                                llm_verification = self.contradiction_detector.verify_with_llm(
+                                    agent_statements[-1], contradictions
+                                )
+                                intervention_reason = f"Detected contradiction: {llm_verification}"
+                    
+                    # For "judge" mode: Check if we need a judgment (after each agent has spoken)
+                    elif mediator_mode == "judge" and len(self._round_speakers) >= len(self.agents):
+                        should_intervene = True
+                        intervention_reason = "Judging arguments from all agents in this round"
+                    
+                    # If intervention is needed, call the mediator
+                    if should_intervene:
+                        print(f"\n🧑‍⚖️ Mediator intervening: {intervention_reason}")
+                        mediator_response = self.mediator.generate_response(
+                            round_history=self.debate_history,
+                            current_topic=self.config.get("topic", "")
+                        )
+                        
+                        # Add mediator's response to the debate history
+                        self.debate_history.append({
+                            "round": round_num + 1,
+                            "agent": "Mediator",
+                            "role": "Debate Mediator",
+                            "content": mediator_response
+                        })
+                        
+                        # Show mediator's response in the UI
+                        if feedback_callback:
+                            feedback_callback("Mediator", f"### 🧑‍⚖️ Mediator Intervention:\n{mediator_response}")
 
             
-            # Run Delphi synthesis after all agents have spoken
-            print("\n🔮 Delphi Synthesis Phase")
+            # Run Delphi synthesis after all agents have spoken, if enabled in config
+            delphi_config = self.config.get("delphi", {})
+            if delphi_config.get("enabled", False):
+                print("\n🔮 Delphi Synthesis Phase")
 
-            delphi_output = self.delphi_engine.run(
-                round_history=self.debate_history,
-                topic=self.config.get("topic", "")
-            )
+                delphi_output = self.delphi_engine.run(
+                    round_history=self.debate_history,
+                    topic=self.config.get("topic", "")
+                )
 
-            # Save for next round injection
-            self.debate_history.append({
-                "round": round_num + 1,
-                "agent": "Delphi",
-                "role": "Consensus Facilitator",
-                "content": delphi_output
-            })
+                # Save for next round injection
+                self.debate_history.append({
+                    "round": round_num + 1,
+                    "agent": "Delphi",
+                    "role": "Consensus Facilitator",
+                    "content": delphi_output
+                })
 
-            # Optional: Show Delphi result on UI
-            if feedback_callback:
-                feedback_callback("### 🧠 Delphi Synthesis Result:\n" + delphi_output)
-
+                # Optional: Show Delphi result on UI
+                if feedback_callback:
+                    feedback_callback("Delphi", "### 🧠 Delphi Synthesis Result:\n" + delphi_output)
+            else:
+                print("\n🔮 Delphi Synthesis Phase (Disabled)")
+                # Skip Delphi synthesis when disabled
             
             
             
@@ -150,15 +288,16 @@ class DebateManager:
         self.performance_logger.save()
         print("\n🧠 Performance log saved.")
 
-        feedback = get_feedback_form()
-        feedback["satisfaction"] = 9
-        feedback["perceived_bias"] = "Neutral"
-        feedback["clarity_score"] = 8
-        feedback["coherence_score"] = 7
-        feedback["comments"] = "Very insightful debate. Maybe reduce repetition."
-        save_feedback(self.session_id, feedback)
+        # Mock feedback for demonstration purposes
+        # demo_feedback = get_feedback_form()
+        # demo_feedback["satisfaction"] = 10
+        # demo_feedback["perceived_bias"] = "Neutral"
+        # demo_feedback["clarity_score"] = 10
+        # demo_feedback["coherence_score"] = 10
+        # demo_feedback["comments"] = "Very insightful debate. Maybe reduce repetition."
+        # save_feedback(self.session_id, demo_feedback)
 
-        self.finalize_debate()
+        # self.finalize_debate(feedback_callback)
 
         save_log_files(
             session_id=self.session_id,
@@ -169,7 +308,7 @@ class DebateManager:
             performance=self.performance_logger
         )
 
-    def finalize_debate(self):
+    def finalize_debate(self, feedback_callback=None):
         engine = ConsensusEngine(
             strategy=self.config.get("consensus_strategy", "mediator_summary")
         )
@@ -185,6 +324,10 @@ class DebateManager:
 
         print("\n✅ Final Consensus:\n")
         print(consensus)
+        
+        # Send final consensus to UI
+        if feedback_callback:
+            feedback_callback("Final Consensus", f"## ✅ Final Consensus:\n{consensus}")
 
         self.final_summary = consensus
 
@@ -199,4 +342,8 @@ class DebateManager:
         print("\n📋 Final Tester Audit Report:\n")
         print(audit_summary)
         
+        # Send audit summary to UI
+        if feedback_callback:
+            feedback_callback("Audit Report", f"## 📋 Final Tester Audit Report:\n{audit_summary}")
+
 

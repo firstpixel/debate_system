@@ -1,0 +1,28 @@
+{
+  "log": [
+    {
+      "agent": "TechAdvocate",
+      "duration_sec": 7.797
+    },
+    {
+      "agent": "Ethicist",
+      "duration_sec": 8.602
+    },
+    {
+      "agent": "TechAdvocate",
+      "duration_sec": 7.958
+    },
+    {
+      "agent": "Ethicist",
+      "duration_sec": 9.598
+    }
+  ],
+  "summary": {
+    "per_agent_avg_time": {
+      "TechAdvocate": 7.877,
+      "Ethicist": 9.1
+    },
+    "total_turns": 4,
+    "total_time_sec": 33.955
+  }
+}

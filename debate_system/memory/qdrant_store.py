@@ -21,27 +21,31 @@ class LTMStore:
 
     def ensure_collection_exists(self):
         collections = self.client.get_collections().collections
-        collection_names = [c.name for c in collections]
-        if self.collection not in collection_names:
-            print(f"[Qdrant] Creating missing collection: {self.collection}")
+        if self.collection not in [c.name for c in collections]:
             self.client.create_collection(
                 collection_name=self.collection,
-                vectors_config=VectorParams(size=self.vector_size, distance=Distance.COSINE),
+                vectors_config=VectorParams(size=self.vector_size, distance=Distance.COSINE)
             )
-
-
+    
     def store_memory(self, agent_id: str, text: str, tags: List[str]):
         embedding = embed_text(text)
         point = PointStruct(
             id=str(uuid4()),
             vector=embedding,
-            payload={
-                "agent_id": agent_id,
-                "text": text,
-                "tags": tags
-            }
+            payload={"agent_id": agent_id, "text": text, "tags": tags}
         )
         self.client.upsert(collection_name=self.collection, points=[point])
+        
+    # deprecated
+    def add_memory(self, agent_id: str, text: str, tags: List[str]):
+        embedding = embed_text(text)
+        point = PointStruct(
+            id=str(uuid4()),
+            vector=embedding,
+            payload={"agent_id": agent_id, "text": text, "tags": tags}
+        )
+        self.client.upsert(collection_name=self.collection, points=[point])
+
 
     def get_relevant(self, agent_id: str, top_k: int = 5) -> str:
         query_vector = embed_text(agent_id + " memory")
@@ -56,12 +60,12 @@ class LTMStore:
         return "\n".join([hit.payload["text"] for hit in results])
     
     def query_ltm(self, agent_id: str, limit: int = 5) -> str:
-        results = self.client.scroll(
+        results, _ = self.client.scroll(
             collection_name=self.collection,
             scroll_filter={"must": [{"key": "agent_id", "match": {"value": agent_id}}]},
             limit=limit
         )
-        return "\n".join(r.payload.get("text", "") for r in results[0])
+        return "\n".join(r.payload.get("text", "") for r in results)
 
 class RAGRetriever:
     def __init__(self):
@@ -76,11 +80,11 @@ class RAGRetriever:
             limit=top_k
         )
         return "\n".join([r.payload["text"] for r in results])
-    
+
     def query_rag(self, agent_id: str, limit: int = 5) -> str:
-        results = self.client.scroll(
+        results, _ = self.client.scroll(
             collection_name=self.collection,
             scroll_filter={"must": [{"key": "agent_id", "match": {"value": agent_id}}]},
             limit=limit
         )
-        return "\n".join(r.payload.get("text", "") for r in results[0])
+        return "\n".join(r.payload.get("text", "") for r in results)

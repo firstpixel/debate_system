@@ -21,105 +21,96 @@ class STMStore:
         result = self.collection.insert_one(doc)
         return str(result.inserted_id)
 
-    def get_recent_turns(self, agent_id: str, limit: int = 5) -> str:
-        cursor = self.collection.find({"agent_id": agent_id}).sort("timestamp", -1).limit(limit)
-        turns = list(cursor)
-        return "\n".join([t["message"] for t in reversed(turns)])
-
-    def summarize_turns(self, agent_id: str, full_text: str) -> str:
-        return full_text[:1000] + "..." if len(full_text) > 1000 else full_text
-
     def get_recent_turns_raw(self, agent_id: str, limit: int = 20) -> List[Dict]:
         cursor = self.collection.find({"agent_id": agent_id}).sort("timestamp", -1).limit(limit)
-        turns = list(cursor)
-        return list(reversed(turns))
+        return list(reversed(list(cursor)))
 
     def get_all_turns_raw(self, agent_id: str) -> List[Dict]:
         cursor = self.collection.find({"agent_id": agent_id}).sort("timestamp", 1)
         return list(cursor)
 
+    def summarize_turns(self, agent_id: str, full_text: str) -> str:
+        return full_text[:1000] + "..." if len(full_text) > 1000 else full_text
+
+
 class BeliefStore:
     def __init__(self, db):
         self.collection = db["agent_beliefs"]
 
-    def save_full_belief(self, agent_id: str, new_belief: str, summary_generator=None, max_memory: int = 10):
+    def save_belief(self, agent_id: str, new_belief=None, max_memory: int = 10, belief_data: Dict = None):
         doc = self.collection.find_one({"agent_id": agent_id}) or {}
-        all_beliefs = doc.get("all_beliefs", [])
-        all_beliefs.append(new_belief)
+        all_beliefs = []
 
-        verbatim = all_beliefs[-max_memory:]
-        overflow = all_beliefs[:-max_memory]
-        summary = doc.get("summary", "")
+        if new_belief:
+            all_beliefs.append(new_belief)
+            belief_content = new_belief
+        elif belief_data and "belief" in belief_data:
+            all_beliefs.append(belief_data["belief"])
+            belief_content = belief_data["belief"]
+        else:
+            belief_content = None
 
-        if overflow and summary_generator:
-            summary = summary_generator(overflow)
+        if belief_content:
+            update_data = {
+                "all_beliefs": all_beliefs,
+                "verbatim": all_beliefs[-max_memory:],
+                "summary": doc.get("summary", ""),
+                "updated_at": datetime.utcnow(),
+            }
 
-        self.collection.update_one(
+            if belief_data:
+                for key in ["scores", "topic", "round", "turn_id", "contradictions"]:
+                    if key in belief_data:
+                        update_data[key] = belief_data[key]
+
+            self.collection.update_one(
+                {"agent_id": agent_id},
+                {"$set": update_data},
+                upsert=True
+            )
+            
+    def save_belief(self, agent_id: str, new_belief: str = None, max_memory: int = 10, belief_data: Dict = None):
+        if not new_belief and not (belief_data and "belief" in belief_data):
+            return  # Nothing to save
+
+        belief_str = new_belief or belief_data["belief"]
+
+        # Prepare the new document — we replace everything.
+        doc = {
+            "agent_id": agent_id,
+            "all_beliefs": belief_str,
+            "verbatim": belief_str,
+            "summary": belief_str,
+            "updated_at": datetime.utcnow()
+        }
+
+        # Add optional metadata (e.g., contradictions)
+        if belief_data:
+            for key in ["scores", "topic", "round", "turn_id", "contradictions"]:
+                if key in belief_data:
+                    doc[key] = belief_data[key]
+
+        # Replace the entire doc for this agent
+        self.collection.replace_one(
             {"agent_id": agent_id},
-            {
-                "$set": {
-                    "all_beliefs": all_beliefs,
-                    "verbatim": verbatim,
-                    "summary": summary,
-                    "updated_at": datetime.utcnow()
-                }
-            },
+            doc,
             upsert=True
         )
 
-    def get_belief_summary(self, agent_id: str) -> str:
+    def get_beliefs(self, agent_id: str) -> str:
         doc = self.collection.find_one({"agent_id": agent_id})
         if not doc:
-            return "No belief stored."
+            return ""
 
-        lines = []
-        summary = doc.get("summary", "")
-        verbatim = doc.get("verbatim", [])
+        result = []
+        if "summary" in doc:
+            result.append(doc["summary"])
+        if "verbatim" in doc:
+            result.extend(doc["verbatim"])
+        return "\n".join(result)
 
-        if summary:
-            lines.append("## 📌 Summary of Older Beliefs")
-            lines.append(summary.strip())
-        if verbatim:
-            lines.append("\n## 🧠 Recent Beliefs")
-            lines += [f"- {b}" for b in verbatim]
-
-        return "\n".join(lines)
-
-    def get_all_beliefs(self, agent_id: str):
+    def get_contradictions(self, agent_id: str) -> str:
         doc = self.collection.find_one({"agent_id": agent_id})
-        return doc.get("all_beliefs", []) if doc else []
-
-    def reset_beliefs(self, agent_id: str):
-        self.collection.delete_one({"agent_id": agent_id})
-
-    def append_belief(self, agent_id: str, belief: str):
-        self.collection.insert_one({
-            "agent_id": agent_id,
-            "belief": belief,
-            "timestamp": datetime.utcnow()
-        })
-
-    def get_raw_beliefs(self, agent_id: str) -> List[str]:
-        cursor = self.collection.find({"agent_id": agent_id}).sort("timestamp", 1)
-        return [doc["belief"] for doc in cursor if "belief" in doc]
-
-    def get_beliefs(self, agent_id: str) -> str:
-        cursor = self.collection.find({"agent_id": agent_id})
-        return "\n".join(doc.get("belief", "") for doc in cursor if "belief" in doc)
-
-    def save_belief(self, agent_id: str, belief: Dict):
-        latest = list(self.collection.find({"agent_id": agent_id}).sort("belief_version", -1).limit(1))
-        latest_version = latest[0].get("belief_version", 0) if latest else 0
-
-        new_version = latest_version + 1
-
-        self.collection.insert_one({
-            "agent_id": agent_id,
-            "belief": belief.get("belief", ""),
-            "scores": belief.get("scores", {}),
-            "topic": belief.get("topic", ""),
-            "round": belief.get("round", None),
-            "turn_id": belief.get("turn_id", None),
-            "belief_version": new_version,
-            "timestamp": datetime.utcnow()
-        })
+        if not doc or "contradictions" not in doc:
+            return ""
+        return "\n".join(f"- {c}" for c in doc["contradictions"])

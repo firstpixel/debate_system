@@ -46,17 +46,6 @@ class FlowController:
             flagged = context.get("interruption_request", None)
             return flagged if flagged in self.agent_names else random.choice(self.agent_names)
 
-        elif strategy == "delphi":
-            if context.get("delphi_round", False):
-                from app.delphi_engine import DelphiEngine
-                engine = DelphiEngine()
-                agent_outputs = context.get("delphi_inputs", [])
-                delphi_result = engine.run_consensus_round(agent_outputs)
-                context["delphi_result"] = delphi_result
-                return "mediator"  # mediator agent posts the result
-            return random.choice(self.agent_names)
-
-
         elif strategy == "mcts":
             from app.turn_strategy.mcts_turn_selector import MCTSTurnSelector
             selector = MCTSTurnSelector(self.agent_names)

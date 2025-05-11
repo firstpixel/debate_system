@@ -5,6 +5,7 @@ import json
 from typing import List, Dict
 from app.argument_graph import ArgumentGraph
 from app.performance_logger import PerformanceLogger
+import logging
 
 SESSION_DIR = "sessions"
 
@@ -42,6 +43,9 @@ def save_log_files(
     for agent, t in stats["per_agent_avg_time"].items():
         md_lines.append(f"- **{agent}**: avg {t}s")
 
+    # Filter out None values before joining
+    md_lines = [line for line in md_lines if line is not None]
+
     with open(path + "summary.md", "w") as f:
         f.write("\n\n".join(md_lines))
 
@@ -61,3 +65,12 @@ def save_log_files(
         json.dump(json_out, f, indent=2)
 
     print(f"📤 Logs saved to {path}summary.md and summary.json")
+
+def log_turn(agent_name: str, duration: float):
+
+    logger = logging.getLogger()
+    logger.info(f"Agent {agent_name} turn took {duration:.2f} seconds")
+    
+    # Check for truncation in the console output if needed
+    # This is separate from the main logging functionality
+    return False

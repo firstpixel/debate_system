@@ -2,13 +2,12 @@ import logging
 import numpy as np
 from typing import Dict, List, Optional
 from sklearn.metrics.pairwise import cosine_similarity
-from ollama import Client
 import os
 
-from app.memory_manager import MemoryManager
 from app.core_llm import LLMClient
 from app.contradiction_detector import ContradictionDetector
 from app.contradiction_log import ContradictionLog
+from app.agent_state_tracker import AgentStateTracker
 
 os.makedirs("logs", exist_ok=True)
 logger = logging.getLogger(__name__)
@@ -20,16 +19,15 @@ class BayesianTracker:
         embedding_model: str = "nomic-embed-text:latest",
         contradiction_threshold: float = 0.4,
         llm: Optional[LLMClient] = None,
-        memory: Optional[MemoryManager] = None
+        agent_trackers: Optional[Dict[str, AgentStateTracker]] = None
     ):
         self.embedding_model = embedding_model
-        self.client = Client()
+        self.llm = llm or LLMClient()
         self.agent_history: Dict[str, List[str]] = {}
         self.embeddings_cache: Dict[str, np.ndarray] = {}
         self.topic_embedding: Optional[np.ndarray] = None
 
-        self.memory = memory or MemoryManager()
-        self.llm = llm or LLMClient()
+        self.trackers = agent_trackers or {}
         self.detector = ContradictionDetector(model_name=embedding_model, use_llm_fallback=True)
         self.contradiction_log = ContradictionLog()
 
@@ -40,7 +38,7 @@ class BayesianTracker:
         if text in self.embeddings_cache:
             return self.embeddings_cache[text]
         logger.info(f"Embedding text with model {self.embedding_model}...")
-        vec = np.array(self.client.embeddings(model=self.embedding_model, prompt=text)["embedding"])
+        vec = np.array(self.llm.embed(text))
         self.embeddings_cache[text] = vec
         return vec
 
@@ -55,29 +53,19 @@ class BayesianTracker:
         logger.info(f"Tracking new turn for {agent}")
         self.agent_history.setdefault(agent, []).append(message)
 
-        # Embed topic once
         if self.topic_embedding is None:
             self.topic_embedding = self._get_embedding(topic)
 
         analysis = self._analyze_semantics(agent)
-        contradiction_data = self._detect_contradiction(agent, message)
+        contradiction_data = self._detect_contradiction(agent)
 
         if contradiction_data["contradicted"]:
             self.contradiction_log.log(
                 agent=agent,
                 new_belief=message,
                 contradicted=contradiction_data["contradicted"],
-                similarity_scores=contradiction_data["scores"]
+                similarity_scores=[0.85] * len(contradiction_data["contradicted"])
             )
-
-        turn_id = self.memory.add_turn(agent, message)
-        self.memory.save_belief(agent, {
-            "latest_statement": message,
-            "drift": analysis["drift"],
-            "coherence": analysis["coherence"],
-            "contradiction": contradiction_data["flag"],
-            "turn_id": turn_id
-        })
 
         self.coherence_scores[agent] = analysis["coherence"]
 
@@ -104,39 +92,24 @@ class BayesianTracker:
             "drift": round(drift, 3)
         }
 
-    def _detect_contradiction(self, agent: str, new_claim: str) -> Dict:
-        belief_str = self.memory.get_context(agent_id=agent, strategy="belief")
-        beliefs = belief_str.splitlines() if isinstance(belief_str, str) else []
-        beliefs = [b.lstrip("- ").strip() for b in beliefs if b.strip()]
+    def _detect_contradiction(self, agent: str) -> Dict:
 
-        if not beliefs:
-            return {"flag": False, "contradicted": [], "scores": []}
+        if agent not in self.trackers:
+            logger.warning(f"Agent '{agent}' not found in tracker registry.")
+            return {"flag": False, "contradicted": [], "verified_explanation": "", "scores": []}
 
-        new_emb = self._get_embedding(new_claim)
-        # Defensive: skip if embedding is empty or invalid
-        if not isinstance(new_emb, (list, np.ndarray)) or len(new_emb) == 0:
-            return {"flag": False, "contradicted": [], "scores": []}
+        tracker = self.trackers[agent]
+        summary = tracker.memory_cache.get("contradictions", "")
+        if not summary.strip():
+            return {"flag": False, "contradicted": [], "verified_explanation": "", "scores": []}
 
-        contradictions = []
-        scores = []
-
-        for belief in beliefs:
-            belief_emb = self._get_embedding(belief)
-            # Defensive: skip if embedding is empty or mismatched
-            if not isinstance(belief_emb, (list, np.ndarray)) or len(belief_emb) == 0 or len(belief_emb) != len(new_emb):
-                continue
-            similarity = float(cosine_similarity([new_emb], [belief_emb])[0][0])
-            scores.append((belief, similarity))
-            if similarity >= self.contradiction_threshold:
-                contradictions.append(belief)
-
-        verified = self.detector.verify_with_llm(new_claim, contradictions) if contradictions else ""
-
+        lines = summary.splitlines()
+        contradicted = [ln.split(" ⟶")[0].lstrip("• ").strip() for ln in lines if ln.startswith("• ")]
         return {
-            "flag": bool(contradictions),
-            "contradicted": contradictions,
-            "verified_explanation": verified,
-            "scores": scores
+            "flag": bool(contradicted),
+            "contradicted": contradicted,
+            "verified_explanation": summary,
+            "scores": [0.85] * len(contradicted)
         }
 
     def get_scores(self) -> Dict[str, float]:
@@ -152,8 +125,8 @@ class BayesianTracker:
 
     def get_agent_scores(self, agent: str) -> Dict:
         try:
-            scores = self.memory.belief.get_belief_summary(agent)
-            return scores if isinstance(scores, dict) else {}
+            tracker = self.trackers[agent]
+            return tracker.memory.get_belief_summary(agent, return_type="dict")
         except Exception as e:
             logger.error(f"Failed to get belief summary for {agent}: {e}")
             return {}

@@ -4,7 +4,7 @@ rounds: 2
 use_mediator: true
 consensus_strategy: vote
 logging_mode: markdown
-turn_strategy: priority
+turn_strategy: round_robin
 context_scope: rolling
 argument_tree: true
 bayesian_tracking: true

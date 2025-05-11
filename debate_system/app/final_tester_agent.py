@@ -63,10 +63,8 @@ class FinalTesterAgent:
             {"role": "user", "content": user_prompt.strip()}
         ]
 
-        result = ""
-        for token in self.llm.stream_chat(messages):
-            print(token, end="", flush=True)
-            result += token
+        # Replace streaming with non-streaming call since the output isn't shown in real-time in the UI
+        result = self.llm.chat(messages)
 
         report_path = f"sessions/{session_id}/audit_report.md"
         os.makedirs(os.path.dirname(report_path), exist_ok=True)

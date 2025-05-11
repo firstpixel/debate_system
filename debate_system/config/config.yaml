@@ -5,6 +5,10 @@ rounds: 10
 use_mediator: true
 consensus_strategy: mediator_summary
 turn_strategy: round_robin
+delphi:
+  enabled: true
+  rounds: 1
+  summary_style: bullet_points
 personas:
   - name: "TechAdvocate"
     model: "gemma3:latest"

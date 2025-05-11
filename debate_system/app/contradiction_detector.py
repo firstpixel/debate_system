@@ -53,7 +53,5 @@ class ContradictionDetector:
             {"role": "user", "content": f"### Beliefs:\n{bullets}\n\n### New Claim:\n{new_statement}\n\nIs there a contradiction? Respond in Markdown."}
         ]
 
-        response = ""
-        for token in self.llm.stream_chat(prompt):
-            response += token
-        return response
+        # Replace streaming with non-streaming call since result isn't shown in UI
+        return self.llm.chat(prompt)
