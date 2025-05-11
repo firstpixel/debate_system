@@ -1,6 +1,6 @@
 # 🧠 Autonomous Multi-LLM Markdown Debate Engine
 
-This project simulates a full-scale multi-agent debate using local LLMs via **Ollama**, with agents reasoning entirely in **Markdown** and a fully traceable architecture. Supports MCTS turn logic, Delphi consensus, belief memory, contradiction detection, argument trees, and more.
+This project simulates a full-scale multi-agent debate using local LLMs via **Ollama**, with agents reasoning entirely in **Markdown** and a fully traceable architecture. Supports multiple turn strategies including round-robin and Delphi consensus, with tiered memory management, contradiction detection, argument trees, and more.
 
 ---
 
@@ -8,41 +8,49 @@ This project simulates a full-scale multi-agent debate using local LLMs via **Ol
 
 - Persona agents with evolving beliefs and roles
 - Fully autonomous loop: turn selection → LLM reasoning → belief update
-- Supports `round_robin`, `mcts`, `priority`, `interrupt`, `delphi` turn strategies
-- Summarizer, contradiction detector, scoring, consensus engine
+- Multi-tiered memory system (STM, LTM, belief memory)
+- Supports `round_robin`, `priority`, `interrupt`, `delphi` turn strategies
+- Advanced contradiction detection with vector similarity and LLM verification
+- Memory summarization for handling long-running debates
 - Recovery, replay, and persistent session storage
 - Argument tree generation and export (Markdown + JSON)
-- Real-time Streamlit UI
+- Real-time Streamlit UI with streaming responses
 - Designed for local models (uses `gemma3:latest` via Ollama)
 
 ---
 
-## 🧱 Folder Structure
+## 🧱 Architecture
 
-```
+```plaintext
 debate_system/
-├── app/                 # Core logic
-│   ├── persona_agent.py
-│   ├── mediator_agent.py
-│   ├── consensus_engine.py
-│   ├── context_builder.py
-│   ├── argument_graph.py
-│   ├── performance_logger.py
-│   ├── config.py
-│   ├── tools.py
-│   ├── flow_control.py
-│   ├── debate_manager.py
-│   ├── session_recovery.py
-│   ├── logger.py
-│   ├── user_feedback.py
-│   └── integration_plugin.py
-├── ui/                  # Streamlit frontend
-│   ├── streamlit_app.py
-│   └── components.py
-├── plugins/             # Custom validators/tools (optional)
-├── sessions/            # Output folder per run
-├── tests/               # Pytest-based validation
-└── requirements.txt
+├── app/                  # Core logic
+│   ├── persona_agent.py      # Agent implementation
+│   ├── mediator_agent.py     # Mediator/synthesis agent
+│   ├── memory_manager.py     # Centralized memory manager
+│   ├── agent_state_tracker.py# Agent state/memory tracking
+│   ├── contradiction_detector.py # Detects belief contradictions
+│   ├── context_builder.py    # Manages context window allocation
+│   ├── consensus_engine.py   # Consensus generation
+│   ├── delphi_engine.py      # Delphi method implementation
+│   ├── argument_graph.py     # Tree of debate points
+│   ├── debate_manager.py     # Orchestrates the debate
+│   ├── flow_control.py       # Turn management strategies
+│   ├── core_llm.py           # LLM client wrapper
+│   ├── performance_logger.py # Performance tracking
+│   ├── logger.py             # Logging functionality
+│   └── main.py               # CLI entry point
+├── memory/                # Memory systems
+│   ├── mongo_store.py         # MongoDB-based STM and beliefs
+│   ├── qdrant_store.py        # Vector DB for LTM and RAG
+│   └── embeddings.py          # Embedding utilities
+├── ui/                   # Streamlit frontend
+│   ├── streamlit_app.py      # Main UI
+│   └── pages/                # UI components
+├── plugins/              # Custom validators/tools
+├── sessions/             # Output folder per run
+├── tests/                # Pytest-based validation
+├── docker-compose.yaml   # MongoDB & Qdrant containers
+└── requirements.txt      # Python dependencies
 ```
 
 ---
@@ -52,7 +60,7 @@ debate_system/
 Install Ollama (https://ollama.com) and pull a model:
 
 ```bash
-ollama pull gemma:7b
+ollama pull gemma3:4b
 ```
 
 Create and activate your Python environment:
