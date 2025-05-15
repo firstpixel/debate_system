@@ -53,61 +53,63 @@ if st.session_state.cfg_text:
             # Track messages chronologically
             messages_chronological = []
             
-            def stream_feedback(agent_name: str, current_message_chunk: str):
-                # If this is a new message (first chunk), add it to our chronological list
-                if agent_name not in st.session_state.get("current_speakers", set()):
-                    # Track that this agent is now speaking
-                    if "current_speakers" not in st.session_state:
-                        st.session_state.current_speakers = set()
-                    
-                    st.session_state.current_speakers.add(agent_name)
-                    
-                    # Create a new message entry
-                    message_index = len(messages_chronological)
-                    messages_chronological.append({
+            def stream_feedback(agent_name: str, full_message: str):
+                if "messages_chronological" not in st.session_state:
+                    st.session_state.messages_chronological = []
+                if "completed_rounds" not in st.session_state:
+                    st.session_state.completed_rounds = []
+
+                # ── Round Marker (visual section divider) ──
+                if agent_name == "Round_Marker":
+                    round_id = len(st.session_state.completed_rounds)
+                    message_entry = {
                         "agent": agent_name,
-                        "text": current_message_chunk,
+                        "round_id": round_id,
+                        "text": full_message,
                         "box": feedback_container.empty()
-                    })
-                else:
-                    # Find the most recent message from this agent
-                    for message in reversed(messages_chronological):
-                        if message["agent"] == agent_name:
-                            message["text"] += current_message_chunk
-                            break
-                
-                # Clear speakers set when an agent finishes (this assumes chunks come in sequence)
-                if agent_name == "Delphi" or agent_name == "Final Consensus" or agent_name == "Audit Report":
-                    # Reset speakers after Delphi/final outputs which mark end of a phase
-                    st.session_state.current_speakers = set()
-                
-                # Update the UI for this message
-                for message in messages_chronological:
-                    # Apply special formatting based on agent type
-                    if message["agent"] == "Round_Marker":
-                        # For round markers, use distinct styling with dividers
-                        message["box"].markdown(f'<div style="text-align:center; margin:20px 0; border-top:1px solid #ddd; border-bottom:1px solid #ddd; padding:8px 0;">{message["text"]}</div>', unsafe_allow_html=True)
-                    elif message["agent"] == "Delphi":
-                        prefix = "🧠 **Delphi Synthesis (Round " + str(len(st.session_state.get("completed_rounds", [])) + 1) + ")**:"
-                        message["box"].markdown(f'{prefix} {message["text"]}▌')
-                    elif message["agent"] == "Mediator":
-                        prefix = "🧑‍⚖️ **Mediator**:"
-                        message["box"].markdown(f'{prefix} {message["text"]}▌')
-                    elif message["agent"] == "Final Consensus":
-                        prefix = "✅ **Final Consensus**:"
-                        message["box"].markdown(f'{prefix} {message["text"]}▌')
-                    elif message["agent"] == "Audit Report":
-                        prefix = "📋 **Audit Report**:"
-                        message["box"].markdown(f'{prefix} {message["text"]}▌')
-                    else:
-                        prefix = f'🗣️ **{message["agent"]}**:'
-                        message["box"].markdown(f'{prefix} {message["text"]}▌')
-                
-                # Track completed rounds when Delphi speaks
+                    }
+                    st.session_state.messages_chronological.append(message_entry)
+                    message_entry["box"].markdown(
+                        f'<div style="text-align:center; margin:20px 0; border-top:1px solid #ddd; border-bottom:1px solid #ddd; padding:8px 0;">{full_message}</div>',
+                        unsafe_allow_html=True
+                    )
+                    return
+
+                # ── Determine current round ──
+                current_round = len(st.session_state.completed_rounds)
+
+                # ── Add new message box with full content ──
+                message_entry = {
+                    "agent": agent_name,
+                    "round_id": current_round,
+                    "text": full_message,
+                    "box": feedback_container.empty()
+                }
+                st.session_state.messages_chronological.append(message_entry)
+
+                # ── Format and render the box ──
+                round_number = current_round + 1
                 if agent_name == "Delphi":
-                    if "completed_rounds" not in st.session_state:
-                        st.session_state.completed_rounds = []
+                    prefix = f"🧠 **Delphi Synthesis (Round {round_number})**:"
+                elif agent_name == "Mediator":
+                    prefix = f"🧑‍⚖️ **Mediator (Round {round_number})**:"
+                elif agent_name == "Final Consensus":
+                    prefix = "✅ **Final Consensus**:"
+                elif agent_name == "Audit Report":
+                    prefix = "📋 **Audit Report**:"
+                else:
+                    prefix = f'🗣️ **{agent_name} (Round {round_number})**:'
+
+                message_entry["box"].markdown(f"{prefix} {full_message}")
+
+                # ── Track round completion if Delphi finishes ──
+                if agent_name == "Delphi":
                     st.session_state.completed_rounds.append(True)
+
+
+
+
+
 
             dm.start(feedback_callback=stream_feedback)
 

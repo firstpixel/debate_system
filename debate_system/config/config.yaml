@@ -1,12 +1,12 @@
 ## ✅ Placeholder `config.yaml` for immediate testing
 
 topic: "Is AI capable of replacing full human jobs?"
-rounds: 10
-use_mediator: true
+rounds: 40
+use_mediator: false
 consensus_strategy: mediator_summary
 turn_strategy: round_robin
 delphi:
-  enabled: true
+  enabled: false
   rounds: 1
   summary_style: bullet_points
 personas:
@@ -19,5 +19,5 @@ personas:
     role: "AI Skeptic, Ethical Concerns, Human-Centric, Negationist of AI, economy crash"
     temperature: 0.6
 mediator:
-  type: active
+  type: summarizer
   model: "gemma3:latest"

@@ -57,11 +57,24 @@ debate_system/
 
 ## ⚙️ Setup
 
-Install Ollama (https://ollama.com) and pull a model:
+### Prerequisites
+
+1. **Ollama**: Install [Ollama](https://ollama.com) and pull the required model:
 
 ```bash
-ollama pull gemma3:4b
+ollama pull gemma3:latest
 ```
+
+2. **MongoDB & Qdrant**: You can run these using Docker:
+
+```bash
+cd debate_system
+docker-compose up -d
+```
+
+Or install them locally following their documentation.
+
+### Python Environment
 
 Create and activate your Python environment:
 
@@ -95,26 +108,27 @@ python3 app/main.py
 
 Results will be saved in:
 
-```
+```plaintext
 sessions/{session_id}/
 ├── summary.md            # Markdown debate log
 ├── summary.json          # Structured output
-├── performance_log.json
-├── agent_states.json
-├── argument_graph.json
-├── user_feedback.json
+├── turns.log             # Individual turn logs
+├── performance_log.json  # Performance metrics
+└── argument_graph.json   # Structured argument tree
 ```
 
 ---
 
-## 🧠 Agent Capabilities
+## 🧠 Memory System
 
-Agents:
-- Anchor responses using memory
-- Respond using Markdown only
-- Avoid self-contradiction
-- Adjust beliefs over time
-- Interact with mediator and tools
+The debate system uses a multi-tiered memory architecture:
+
+1. **Short-Term Memory (STM)** - Recent conversation turns stored in MongoDB
+2. **Long-Term Memory (LTM)** - Historical semantic information stored in Qdrant
+3. **Belief Memory** - Agent's core beliefs and contradictions
+4. **RAG Retrieval** - Vector-based knowledge retrieval
+
+Memory is dynamically summarized to fit within context windows, with intelligent token allocation between different memory components.
 
 ---
 
@@ -126,21 +140,27 @@ pytest tests/
 
 ---
 
-## 🧠 Default LLM Setup
+## 🌟 Default LLM Setup
 
-All agents run `gemma3:latest` via Ollama, with real streamed chat (`stream=True`).
+All agents run `gemma3:latest` via Ollama, with real-time streamed responses. The system is designed to work with:
+
+- Context window: 4096 tokens (configurable)
+- Response reserve: 1024 tokens
+- Customizable token allocation ratios
 
 ---
 
 ## ✨ Contributions
 
 PRs and feature suggestions welcome. Future roadmap includes:
-- Live graph visualizer
-- Tool sandbox
-- Agent retraining via feedback
+
+- Live argument graph visualization
+- Custom tool integration
+- Agent finetuning via debate feedback
+- Support for additional local models
 
 ---
 
 ## 🧠 Maintained by
 
-Gil B. + ChatGPT
+Gil B. 

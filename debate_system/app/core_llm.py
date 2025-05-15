@@ -22,10 +22,10 @@ class LLMClient:
             stream=False,
             options={
                 "temperature": self.temperature,
-                "top_p": 0.7,
+                "top_p": 0.9,
                 "frequency_penalty": 0.1,
-                "presence_penalty": 0.2,
-                "num_predict": 512,
+                "presence_penalty": 0.3,
+                "num_predict": 1024,
                 # "num_gpu": 1,  # Ensure we use GPU
                 # "num_ctx": 4096,
                 "mmap": True,  # Enable memory mapping for better performance

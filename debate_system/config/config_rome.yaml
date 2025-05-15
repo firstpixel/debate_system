@@ -1,0 +1,31 @@
+## ✅ Config ajustado para testes imediatos
+
+topic: "Quais são os 10 destaques que um visitante deve observar em uma visita ao Museu do Vaticano. Pontue e justifique o motivo, considerando relevância artística ou arquitetônica, contexto histórico, perfil do autor e outras considerações culturais ou curiosidades que considerar interessantes. Organize em tópicos e informe as localizações dos destaques apresentados."
+rounds: 15
+use_mediator: true
+consensus_strategy: mediator_summary
+turn_strategy: round_robin
+delphi:
+  enabled: true
+  rounds: 1
+  summary_style: bullet_points
+personas:
+  - name: "Arquiteto"
+    model: "gemma3:latest"
+    role: "Especialista em arquitetura; destaca valor arquitetônico, soluções construtivas, design espacial e integração estética das galerias e basílicas."
+    temperature: 0.8
+  - name: "Teologo"
+    model: "gemma3:latest"
+    role: "Analisa simbolismo religioso, significado litúrgico das obras, doutrina católica e conexões entre arte sacra e teologia."
+    temperature: 0.7
+  - name: "Historiador"
+    model: "gemma3:latest"
+    role: "Contextualiza cronologia, eventos sociopolíticos, patronagem papal e influências culturais que moldaram as coleções."
+    temperature: 0.75
+  - name: "EspecialistaArte"
+    model: "gemma3:latest"
+    role: "Foca em crítica artística, técnicas, autoria, escolas de arte, restauração e legado estético das obras expostas."
+    temperature: 0.8
+mediator:
+  type: active
+  model: "gemma3:latest"

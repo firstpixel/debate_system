@@ -37,9 +37,10 @@ Debate topic: "{topic}".
 **Debate Protocol (follow strictly):**
 
 1. **Length & Structure**
-   • Max 150 tokens per turn.  
-   • Begin with a one-sentence *definition* of any key term you'll rely on.  
-   • Then supply up to **3 numbered points** (≤40 tokens each).  
+   • Max 300 tokens per turn.  
+   • Begin with a one-sentence *definition* of any key term you'll rely on.
+   • Then supply up to **3 numbered points** (≤40 tokens each).
+   • Provide solutions to opponent's inquires, keeping your beliefs.
    • End with:  
      - one concrete policy or experiment suggestion, and  
      - **one direct question** for your opponent.
@@ -49,7 +50,7 @@ Debate topic: "{topic}".
 
 3. **Evidence**
    • For every factual claim include a parenthetical citation hint, try to find evidence from the last 5 years.:  
-     `(source: WHO cancer study 2022)` or `(stat: McKinsey 2023 automation report)`.
+     Example: `(study: {{source}} {{year}} {{report_name}})`.
     • If you can't find evidence, say so and use reasoning to prove the claim. `if a is true, then b is true.`
 
 4. **Tone & Language**
@@ -66,6 +67,8 @@ Debate topic: "{topic}".
    • Repetition of phrases across turns.  
    • Over 10% duplicate tokens with previous output (n-gram overlap >4).  
    • Vacuous “I agree/disagree” without novel reasoning.
+   • Remember to focus on the debate, delphi is just to help, do not mention it.
+   • Do not focus on delphi summary, use it to guide the debate without mentining it.
 
 7. **Beliefs, Contradictions and Coherence**
    • Anchor your answers on your past positions, and do not contradict your beliefs.
@@ -81,6 +84,7 @@ Debate topic: "{topic}".
             prompt += f"\n## Your Opponent's Last Statement:\n> {opponent_argument.strip()}"
 
         prompt += f"\n## Your Current Beliefs:\n{beliefs.strip()}"
+        
         return prompt
 
     def interact(
@@ -126,11 +130,14 @@ Debate topic: "{topic}".
 
         response = ""
         start = time.time()
-        for token in self.llm.stream_chat(messages):
-            print(token, end="", flush=True)
-            response += token
-            if stream_callback:
-                stream_callback(token)
+        # for token in self.llm.stream_chat(messages):
+        #     print(token, end="", flush=True)
+        #     response += token
+        #     if stream_callback:
+        #         stream_callback(token)
+        response = self.llm.chat(messages)
+        if stream_callback:
+            stream_callback(response)
         end = time.time()
 
         if self.perf_logger:

@@ -73,16 +73,16 @@ class ContextBuilder:
             token_allocations["system"] -= self._estimate_tokens(system_prompt)
 
         # Include agent's beliefs from tracker (with token limits)
-        beliefs = tracker.get_beliefs()
-        if beliefs:
-            belief_text = self._truncate_to_token_limit(
-                f"🧠 Belief Summary:\n" + "\n".join(beliefs or []), 
-                token_allocations["beliefs"]
-            )
-            messages.append({
-                "role": "user",
-                "content": belief_text
-            })
+        # beliefs = tracker.get_beliefs()
+        # if beliefs:
+        #     belief_text = self._truncate_to_token_limit(
+        #         f"🧠 Belief Summary:\n" + "\n".join(beliefs or []), 
+        #         token_allocations["beliefs"]
+        #     )
+        #     messages.append({
+        #         "role": "user",
+        #         "content": belief_text
+        #     })
         
         # Include LTM context if available tokens
         if token_allocations.get("ltm", 0) > 0:

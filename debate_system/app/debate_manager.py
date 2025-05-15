@@ -37,7 +37,7 @@ class DebateManager:
         self.use_mediator = self.config.get("use_mediator", False)
         if self.use_mediator:
             self.mediator = MediatorAgent(
-                mode=mediator_config.get("type", "active"),
+                mode=mediator_config.get("type", "summarizer"),
                 model=mediator_config.get("model", "gemma3:latest"),
                 temperature=mediator_config.get("temperature", 0.5)
             )
@@ -105,10 +105,10 @@ class DebateManager:
                 agent = next(a for a in self.agents if a.name == selected_name)
                 
                 # Update priority scores before next agent selection if using priority strategy
-                if self.config.get("turn_strategy") == "priority":
-                    print(f"Using priority strategy. Current scores: {self.tracker.get_scores()}")
-                    self.flow_controller.update_scores(self.tracker.get_scores())
-                    print(f"Updated priority order: {self.flow_controller._priority_order}")
+                # if self.config.get("turn_strategy") == "priority":
+                #     print(f"Using priority strategy. Current scores: {self.tracker.get_scores()}")
+                #     self.flow_controller.update_scores(self.tracker.get_scores())
+                #     print(f"Updated priority order: {self.flow_controller._priority_order}")
 
                 # Track which agents have spoken in this round to avoid duplicates
                 if not hasattr(self, '_round_speakers'):
@@ -158,7 +158,7 @@ class DebateManager:
                     prompt = f"Topic: {topic}"
                     if theme != None:
                         prompt += f"\n\n{theme}"
-                    prompt +=f" \n\nRound {round_num + 1}, your turn: {agent.name}\n\n🧠 Delphi Summary:\n{delphi_comment.strip()}"
+                    # prompt +=f" \n\nRound {round_num + 1}, your turn: {agent.name}\n\n🧠 Delphi Summary:\n{delphi_comment.strip()}"
                 
                 
                 
@@ -177,7 +177,7 @@ class DebateManager:
                 print(f"Agent {agent.name} is interacting with prompt: {prompt}")
                 print(f"Opponent's last statement: {opponent_last}")
                 print(f"Debate history: {self.debate_history}")
-                    
+                response=""
                 response = agent.interact(
                     user_prompt=prompt,
                     opponent_argument=opponent_last,
@@ -237,50 +237,51 @@ class DebateManager:
                         intervention_reason = "Judging arguments from all agents in this round"
                     
                     # If intervention is needed, call the mediator
-                    if should_intervene:
-                        print(f"\n🧑‍⚖️ Mediator intervening: {intervention_reason}")
-                        mediator_response = self.mediator.generate_response(
-                            round_history=self.debate_history,
-                            current_topic=self.config.get("topic", "")
-                        )
+                    # if should_intervene:
+                    #     print(f"\n🧑‍⚖️ Mediator intervening: {intervention_reason} ----------------------------")
+                    #     mediator_response = self.mediator.generate_response(
+                    #         round_history=self.debate_history,
+                    #         current_topic=self.config.get("topic", "")
+                    #     )
                         
-                        # Add mediator's response to the debate history
-                        self.debate_history.append({
-                            "round": round_num + 1,
-                            "agent": "Mediator",
-                            "role": "Debate Mediator",
-                            "content": mediator_response
-                        })
+                    #     # Add mediator's response to the debate history
+                    #     self.debate_history.append({
+                    #         "round": round_num + 1,
+                    #         "agent": "Mediator",
+                    #         "role": "Debate Mediator",
+                    #         "content": mediator_response
+                    #     })
                         
                         # Show mediator's response in the UI
-                        if feedback_callback:
-                            feedback_callback("Mediator", f"### 🧑‍⚖️ Mediator Intervention:\n{mediator_response}")
+                        # if feedback_callback:
+                        #     feedback_callback("Mediator", f"### 🧑‍⚖️ Mediator Intervention:\n{mediator_response}")
 
-            
-            # Run Delphi synthesis after all agents have spoken, if enabled in config
-            delphi_config = self.config.get("delphi", {})
-            if delphi_config.get("enabled", False):
-                print("\n🔮 Delphi Synthesis Phase")
+            if round_num % 10 == 0 :
+                # Run Delphi synthesis after all agents have spoken, if enabled in config
+                delphi_config = self.config.get("delphi", {})
+                if delphi_config.get("enabled", False):
+                    print("\n🔮 Delphi Synthesis Phase----------------------------------------------------")
 
-                delphi_output = self.delphi_engine.run(
-                    round_history=self.debate_history,
-                    topic=self.config.get("topic", "")
-                )
+                    delphi_output = self.delphi_engine.run(
+                        round_history=self.debate_history,
+                        topic=self.config.get("topic", ""),
+                        agents_num=len(self.agents)
+                    )
 
-                # Save for next round injection
-                self.debate_history.append({
-                    "round": round_num + 1,
-                    "agent": "Delphi",
-                    "role": "Consensus Facilitator",
-                    "content": delphi_output
-                })
+                    # Save for next round injection
+                    self.debate_history.append({
+                        "round": round_num + 1,
+                        "agent": "Delphi",
+                        "role": "Consensus Facilitator",
+                        "content": delphi_output
+                    })
 
-                # Optional: Show Delphi result on UI
-                if feedback_callback:
-                    feedback_callback("Delphi", "### 🧠 Delphi Synthesis Result:\n" + delphi_output)
-            else:
-                print("\n🔮 Delphi Synthesis Phase (Disabled)")
-                # Skip Delphi synthesis when disabled
+                    # # Optional: Show Delphi result on UI
+                    # if feedback_callback:
+                    #     feedback_callback("Delphi", "#### 🧠 Delphi Synthesis Result:\n" + delphi_output)
+                else:
+                    print("\n🔮 Delphi Synthesis Phase (Disabled)")
+                    # Skip Delphi synthesis when disabled
             
             
             
@@ -297,7 +298,7 @@ class DebateManager:
         # demo_feedback["comments"] = "Very insightful debate. Maybe reduce repetition."
         # save_feedback(self.session_id, demo_feedback)
 
-        # self.finalize_debate(feedback_callback)
+        self.finalize_debate(feedback_callback)
 
         save_log_files(
             session_id=self.session_id,
@@ -325,9 +326,6 @@ class DebateManager:
         print("\n✅ Final Consensus:\n")
         print(consensus)
         
-        # Send final consensus to UI
-        if feedback_callback:
-            feedback_callback("Final Consensus", f"## ✅ Final Consensus:\n{consensus}")
 
         self.final_summary = consensus
 

@@ -33,10 +33,10 @@ class MediatorAgent:
 
         # The mediator's response IS shown in the UI, so we'll keep the streaming call
         response = ""
-        for token in self.llm.stream_chat(prompt):
-            print(token, end="", flush=True)
-            response += token
-
+        # for token in self.llm.stream_chat(prompt):
+        #     print(token, end="", flush=True)
+        #     response += token
+        response = self.llm.chat(prompt)
         return response
 
     def _build_prompt(self, history: List[Dict], topic: str) -> List[Dict]:
