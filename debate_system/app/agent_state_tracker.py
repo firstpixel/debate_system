@@ -19,6 +19,7 @@ class AgentStateTracker:
         self.contradiction_detector = ContradictionDetector()
         self.memory = MemoryManager()
         self._last_contradiction_msg: str = ""
+        self.stm = []
 
         # Cache full context for startup or debugging (can be used in UI)
         self.memory_cache: Dict[str, str] = {
@@ -58,7 +59,6 @@ class AgentStateTracker:
         return [
             {
                 "role": "assistant" if turn["agent_id"] == self.agent_name else "user",
-#                "content": f"{turn['agent_id']}: {turn.get('message', '')}"
                 "content": turn.get("message", ""),
             }
             for turn in raw_turns
@@ -187,6 +187,17 @@ class AgentStateTracker:
             self.memory_cache.get("beliefs", "").strip(),
             self.memory_cache.get("contradictions", "").strip()
         ])
+        
+        
+    def get_total_rounds(self) -> int:
+        # Suppose self.stm is a list of all messages in order
+        return len(self.stm)
+
+    def get_summary_of_rounds(self, start: int, end: int) -> str:
+        # Summarize messages from self.stm[start-1:end]
+        # For now, just join their content as a placeholder
+        relevant = self.stm[start-1:end]
+        return "\n".join(msg["content"] for msg in relevant)
 
 # -------------------------------------------------------------------------
 # Prompt constants

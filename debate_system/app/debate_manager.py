@@ -158,7 +158,7 @@ class DebateManager:
                     prompt = f"Topic: {topic}"
                     if theme != None:
                         prompt += f"\n\n{theme}"
-                    # prompt +=f" \n\nRound {round_num + 1}, your turn: {agent.name}\n\n🧠 Delphi Summary:\n{delphi_comment.strip()}"
+                    prompt +=f" \n\nRound {round_num + 1}, your turn: {agent.name}\n\nSummary:\n{delphi_comment.strip()}"
                 
                 
                 
@@ -237,20 +237,20 @@ class DebateManager:
                         intervention_reason = "Judging arguments from all agents in this round"
                     
                     # If intervention is needed, call the mediator
-                    # if should_intervene:
-                    #     print(f"\n🧑‍⚖️ Mediator intervening: {intervention_reason} ----------------------------")
-                    #     mediator_response = self.mediator.generate_response(
-                    #         round_history=self.debate_history,
-                    #         current_topic=self.config.get("topic", "")
-                    #     )
+                    if should_intervene:
+                        print(f"\n🧑‍⚖️ Mediator intervening: {intervention_reason} ----------------------------")
+                        mediator_response = self.mediator.generate_response(
+                            round_history=self.debate_history,
+                            current_topic=self.config.get("topic", "")
+                        )
                         
-                    #     # Add mediator's response to the debate history
-                    #     self.debate_history.append({
-                    #         "round": round_num + 1,
-                    #         "agent": "Mediator",
-                    #         "role": "Debate Mediator",
-                    #         "content": mediator_response
-                    #     })
+                        # Add mediator's response to the debate history
+                        self.debate_history.append({
+                            "round": round_num + 1,
+                            "agent": "Mediator",
+                            "role": "Debate Mediator",
+                            "content": mediator_response
+                        })
                         
                         # Show mediator's response in the UI
                         # if feedback_callback:

@@ -52,89 +52,46 @@ class ContextBuilder:
 
     def build_context_messages(self, agent_name: str, tracker: AgentStateTracker, mode: str = "default") -> List[Dict]:
         """
-        Constructs the full message history to be sent to the LLM using the agent's tracker only.
-        Dynamically allocates context space based on available tokens.
+        Constructs the full message history for the LLM:
+          - Adds a summary of all rounds except the last 5 (if available)
+          - Adds the previous 5 messages from all agents
+          - Sets role: 'user' for the requesting agent, 'assistant' for others
         """
         messages = []
         available_tokens = self.context_length - self.response_reserve
-        
+
         # Calculate token allocations
         token_allocations = self._calculate_token_allocations(available_tokens)
-        
         logger.info(f"Context allocations for {agent_name}: {token_allocations}")
-        
-        # Optional system message per mode
-        system_prompt = self._get_system_prompt_for_mode(mode)
-        if system_prompt:
-            messages.append({
-                "role": "system",
-                "content": system_prompt.strip()
-            })
-            token_allocations["system"] -= self._estimate_tokens(system_prompt)
 
-        # Include agent's beliefs from tracker (with token limits)
-        # beliefs = tracker.get_beliefs()
-        # if beliefs:
-        #     belief_text = self._truncate_to_token_limit(
-        #         f"🧠 Belief Summary:\n" + "\n".join(beliefs or []), 
-        #         token_allocations["beliefs"]
-        #     )
-        #     messages.append({
-        #         "role": "user",
-        #         "content": belief_text
-        #     })
-        
-        # Include LTM context if available tokens
-        if token_allocations.get("ltm", 0) > 0:
-            ltm_context = tracker.get_ltm_context(limit=5)  # Adjust limit based on content size
-            if ltm_context:
-                ltm_text = self._truncate_to_token_limit(
-                    f"🌟 Long-Term Memory:\n{ltm_context}", 
-                    token_allocations["ltm"]
-                )
+        # 1. Add summary of all rounds except the last 5
+        if hasattr(tracker, "get_total_rounds") and hasattr(tracker, "get_summary_of_rounds"):
+            total_rounds = tracker.get_total_rounds()
+            if total_rounds > 5:
+                summary = tracker.get_summary_of_rounds(1, total_rounds - 5)
+                if summary:
+                    messages.append({
+                        "role": "user",
+                        "content": f"Summary of rounds 1 to {total_rounds - 5}:\n{summary}"
+                    })
+
+        # 2. Add previous 5 messages from all agents, with correct roles
+        if hasattr(tracker, "get_recent_messages"):
+            recent_messages = tracker.get_recent_messages(limit=5)
+            for msg in recent_messages:
+                speaker = msg.get("speaker", "")
+                content = msg.get("content", "")
+                # Set role: 'user' if this is the requesting agent, else 'assistant'
+                role = "user" if speaker == agent_name else "assistant"
                 messages.append({
-                    "role": "user", 
-                    "content": ltm_text
+                    "role": role,
+                    "content": content
                 })
-        
-        # Include RAG context if available tokens
-        if token_allocations.get("rag", 0) > 0:
-            rag_context = tracker.get_rag_context(limit=3)  # Adjust limit based on content size
-            if rag_context:
-                rag_text = self._truncate_to_token_limit(
-                    f"📚 Knowledge Context:\n{rag_context}", 
-                    token_allocations["rag"]
-                )
-                messages.append({
-                    "role": "user",
-                    "content": rag_text
-                })
-                
-        # Add recent memory messages with remaining token allocations
-        remaining_tokens = token_allocations.get("stm", 0)
-        recent_messages = self._get_recent_messages_within_limit(
-            tracker, agent_name, remaining_tokens
-        )
-        
-        messages.extend(recent_messages)
-        
+
         # Log final context size
         total_tokens = sum(self._estimate_tokens(m["content"]) for m in messages)
         logger.info(f"Final context size for {agent_name}: ~{total_tokens} tokens")
-        
-        # Adjust token distribution for different modes
-        if mode == "delphi" or mode == "mediator":
-            self.distribution_ratios.update({
-                "beliefs": 0.05,    # Reduce belief context
-                "stm": 0.60,        # Increase dialogue history
-                "ltm": 0.05,        # Reduce LTM
-                "rag": 0.05,        # Reduce RAG
-                "system": 0.15,     # Increase system prompt
-                "reserves": 0.10    # Keep some reserve
-            })
-            # Increase response reserve for synthesis
-            self.response_reserve = int(self.context_length * 0.40)  # 40% for response
-    
+
         return messages
 
     def _calculate_token_allocations(self, available_tokens: int) -> Dict[str, int]:
@@ -148,51 +105,12 @@ class ContextBuilder:
         """Rough estimation of tokens in text (4 chars ~= 1 token for English text)."""
         return len(text) // 4
     
-    def _truncate_to_token_limit(self, text: str, token_limit: int) -> str:
-        """Truncate text to stay within token limit, preserving important content."""
-        estimated_tokens = self._estimate_tokens(text)
-        
-        if estimated_tokens <= token_limit:
-            return text
-            
-        # For bullet lists, try to keep whole bullets
-        if text.startswith("🧠 Belief Summary") or "•" in text:
-            lines = text.split("\n")
-            header = lines[0]
-            bullets = lines[1:]
-            
-            result = [header]
-            current_tokens = self._estimate_tokens(header)
-            
-            for bullet in bullets:
-                bullet_tokens = self._estimate_tokens(bullet)
-                if current_tokens + bullet_tokens <= token_limit:
-                    result.append(bullet)
-                    current_tokens += bullet_tokens
-                else:
-                    break
-                    
-            return "\n".join(result)
-            
-        # Simple truncation with ellipsis for other text
-        char_limit = token_limit * 4  # Approximate char to token conversion
-        return text[:char_limit] + "..." if len(text) > char_limit else text
         
     def _get_recent_messages_within_limit(
         self, tracker: AgentStateTracker, agent_name: str, token_limit: int
     ) -> List[Dict]:
         """Get summarized short-term memory within token limit."""
         
-        # Use summarized memory for longer conversations
-        if self.context_scope in ["full", "summarized"]:
-            # Get summarized STM that fits in token limit
-            summarized_content = self.get_summarized_stm(tracker, agent_name, token_limit)
-            
-            if summarized_content:
-                return [{
-                    "role": "user",
-                    "content": f"📝 Conversation Summary:\n{summarized_content}"
-                }]
         
         # Fall back to original approach for shorter conversations or other scopes
         all_turns = tracker.get_recent_messages(limit=self.window_size)
@@ -220,11 +138,7 @@ class ContextBuilder:
             
         return result
 
-    def get_summarized_stm(self, tracker: AgentStateTracker, agent_name: str, token_limit: int) -> str:
-        """Get summarized short-term memory that fits within token limit."""
-        memory_mgr = tracker.memory
-        summarized = memory_mgr.summarize_memory(agent_name, preserve_last_n=5)
-        return self._truncate_to_token_limit(summarized, token_limit)
+
 
     def _get_system_prompt_for_mode(self, mode: str) -> str:
         if mode == "judge":
