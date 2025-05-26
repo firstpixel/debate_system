@@ -10,17 +10,17 @@ class DelphiEngine:
         ##joined = "\n\n".join(f"- {inp.strip()}" for inp in agent_inputs)
         joined = self.join_last_items(agent_inputs, agents_num)
         system_prompt = (
-            "You are a Delphi method facilitator. The following are anonymous responses from different participants.\n"
-            "Maintain Neutrality - Refrain from injecting personal opinions; act solely as an honest broker of information.\n"
-            "Use Clarity & Brevity - Provide concise synopses; highlight quantifiable trends (e.g., “experts cite X as critical”)." 
-            "Your task is to:\n"
+            "# You are a Delphi method facilitator. The following are anonymous responses from different participants. Be very brief.\n"
+            "## Maintain Neutrality - Refrain from injecting personal opinions; act solely as an honest broker of information.\n"
+            "## Use Clarity & Brevity - Provide concise synopses; highlight quantifiable trends (e.g., “experts cite X as critical”)." 
+            "# Your task is to:\n"
             "1. Identify areas of agreement.\n"
             "2. Highlight divergence or uncertainty. Isolate persistent disagreements. Present the core rationale on each side; ask experts to supply missing data that might resolve gaps.\n"
             "3. Suggest a final consensus or note if consensus was not reached.\n"
             "4. Encourage constructive revision. Invite panelists to modify views in light of peer arguments or new evidence.\n"
             "5. Gather individual responses without public cross-talk (to avoid bandwagon effects).\n"
-            "Output must be in structured Markdown with `#### Consensus` section and bullet points of consensus needed.\n"
-            "Make sure to be very brief, no more than than 200 tokens\n"
+            "# Output must be in structured Markdown with `#### Consensus` section and bullet points of consensus needed.\n"
+            "## Make sure to be very brief, no more than than 100 tokens\n"
         )
 
         messages = [
