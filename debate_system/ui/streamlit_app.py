@@ -53,7 +53,7 @@ if st.session_state.cfg_text:
             # Track messages chronologically
             messages_chronological = []
             
-            def stream_feedback(agent_name: str, full_message: str):
+            def stream_feedback(agent_name: str, full_message: str, round_number: int = 1):
                 if "messages_chronological" not in st.session_state:
                     st.session_state.messages_chronological = []
                 if "completed_rounds" not in st.session_state:
@@ -61,10 +61,9 @@ if st.session_state.cfg_text:
 
                 # ── Round Marker (visual section divider) ──
                 if agent_name == "Round_Marker":
-                    round_id = len(st.session_state.completed_rounds)
                     message_entry = {
                         "agent": agent_name,
-                        "round_id": round_id,
+                        "round_id": round_number,
                         "text": full_message,
                         "box": feedback_container.empty()
                     }
@@ -75,20 +74,16 @@ if st.session_state.cfg_text:
                     )
                     return
 
-                # ── Determine current round ──
-                current_round = len(st.session_state.completed_rounds)
-
                 # ── Add new message box with full content ──
                 message_entry = {
                     "agent": agent_name,
-                    "round_id": current_round,
+                    "round_id": round_number,
                     "text": full_message,
                     "box": feedback_container.empty()
                 }
                 st.session_state.messages_chronological.append(message_entry)
 
                 # ── Format and render the box ──
-                round_number = current_round + 1
                 if agent_name == "Delphi":
                     prefix = f"🧠 **Delphi Synthesis (Round {round_number})**:"
                 elif agent_name == "Mediator":
@@ -106,12 +101,19 @@ if st.session_state.cfg_text:
                 if agent_name == "Delphi":
                     st.session_state.completed_rounds.append(True)
 
+            # Wrapper to extract round number from debate manager callback
+            def feedback_callback(agent_name, full_message, round_number=None):
+                import re
+                if round_number is not None:
+                    rn = round_number
+                elif agent_name == "Round_Marker":
+                    m = re.search(r"Round (\d+)", full_message)
+                    rn = int(m.group(1)) if m else 1
+                else:
+                    rn = len(st.session_state.completed_rounds) + 1
+                stream_feedback(agent_name, full_message, rn)
 
-
-
-
-
-            dm.start(feedback_callback=stream_feedback)
+            dm.start(feedback_callback=feedback_callback)
 
             # Store results after debate ends
             st.session_state.debate_complete = True

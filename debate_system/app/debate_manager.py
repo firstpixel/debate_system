@@ -172,7 +172,7 @@ class DebateManager:
                     nonlocal response
                     response += token
                     if feedback_callback:
-                        feedback_callback(current_agent_name, token)
+                        feedback_callback(current_agent_name, token, round_num + 1)
                         
                 print(f"Agent {agent.name} is interacting with prompt: {prompt}")
                 print(f"Opponent's last statement: {opponent_last}")
