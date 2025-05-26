@@ -157,13 +157,12 @@ class DebateManager:
                     delphi_comment = next((r["content"] for r in reversed(self.debate_history) if r["agent"] == "Delphi"), "")
                     prompt = f"Topic: {topic}"
                     if theme != None:
-                        prompt += f"\n\n{theme}"
-                    prompt +=f" \n\nRound {round_num + 1}, your turn: {agent.name}\n\nSummary:\n{delphi_comment.strip()}"
-                
-                
-                
+                        prompt += f" Debate Perspective: {theme}"
+                    prompt +=f"  Round {round_num + 1}, your turn: {agent.name}\n\nSummary: {delphi_comment.strip()}"
+
+
                 response = ""
-                
+
                 # Capture the current agent's name for the callback
                 current_agent_name = agent.name
                 
@@ -253,36 +252,36 @@ class DebateManager:
                         })
                         
                         # Show mediator's response in the UI
-                        # if feedback_callback:
-                        #     feedback_callback("Mediator", f"### 🧑‍⚖️ Mediator Intervention:\n{mediator_response}")
+                        if feedback_callback:
+                            feedback_callback("Mediator", f"### 🧑‍⚖️ Mediator Intervention:\n{mediator_response}", round_num + 1)
 
-            if round_num % 10 == 0 :
-                # Run Delphi synthesis after all agents have spoken, if enabled in config
-                delphi_config = self.config.get("delphi", {})
-                if delphi_config.get("enabled", False):
-                    print("\n🔮 Delphi Synthesis Phase----------------------------------------------------")
+            #if round_num % 10 == 0 :
+            # Run Delphi synthesis after all agents have spoken, if enabled in config
+            delphi_config = self.config.get("delphi", {})
+            if delphi_config.get("enabled", False):
+                print("\n🔮 Delphi Synthesis Phase----------------------------------------------------")
 
-                    delphi_output = self.delphi_engine.run(
-                        round_history=self.debate_history,
-                        topic=self.config.get("topic", ""),
-                        agents_num=len(self.agents)
-                    )
+                delphi_output = self.delphi_engine.run(
+                    round_history=self.debate_history,
+                    topic=self.config.get("topic", ""),
+                    agents_num=len(self.agents)
+                )
 
-                    # Save for next round injection
-                    self.debate_history.append({
-                        "round": round_num + 1,
-                        "agent": "Delphi",
-                        "role": "Consensus Facilitator",
-                        "content": delphi_output
-                    })
+                # Save for next round injection
+                self.debate_history.append({
+                    "round": round_num + 1,
+                    "agent": "Delphi",
+                    "role": "Consensus Facilitator",
+                    "content": delphi_output
+                })
 
-                    # # Optional: Show Delphi result on UI
-                    # if feedback_callback:
-                    #     feedback_callback("Delphi", "#### 🧠 Delphi Synthesis Result:\n" + delphi_output)
-                else:
-                    print("\n🔮 Delphi Synthesis Phase (Disabled)")
-                    # Skip Delphi synthesis when disabled
-            
+                # # Optional: Show Delphi result on UI
+                if feedback_callback:
+                    feedback_callback("Delphi", "#### 🧠 Delphi Synthesis Result:\n" + delphi_output, round_num + 1)
+            else:
+                print("\n🔮 Delphi Synthesis Phase (Disabled)")
+                # Skip Delphi synthesis when disabled
+        
             
             
             
