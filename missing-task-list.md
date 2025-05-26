@@ -72,10 +72,6 @@ This list includes only tasks that are still **incomplete or partially wired**, 
 - **Description:** Complete `ScorerTool`, `DelphiScoreAnalyzer`, `ContradictionDetector`, `FactCheckStub` with full access to context from MemoryManager.
 - **Goal:** All tools return structured output, use memory, and influence strategy decisions or logs.
 
-### Task 10 - Plugin System Loader
-- **File:** `app/integration_plugin.py`
-- **Description:** Implement plugin discovery and loading system with YAML or Python entrypoints. Allow tools like `ExternalFactCheck` or `WebRAG` to be injected.
-- **Goal:** Plugins can be added dynamically and executed from mediator/tool interfaces.
 
 ---
 

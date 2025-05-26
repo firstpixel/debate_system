@@ -227,7 +227,6 @@ Performance Logging (performance_logger.py)
 
 User Analytics & Feedback (user_feedback.py)
 
-Integration & Plugin API (integration_plugin.py)
 
 ---
 

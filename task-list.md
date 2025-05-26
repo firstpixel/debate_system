@@ -107,12 +107,6 @@ Each must follow callable protocol and expose structured output.
 - **Description:** Collect user feedback after debates. Use structured forms to capture satisfaction, perceived coherence, bias, and suggestions for agent improvements.
 - **Goal:** System collects and stores structured feedback linked to completed debate sessions.
 
-### Task 15 - Integration & Plugin API
-
-- **File:** `app/integration_plugin.py`
-- **Description:** Define plugin system to support external tools (e.g., RAG modules, DB validators, fact-check agents). Support callable interfaces via YAML or REST-style dispatch.
-- **Goal:** External plugins register and can be invoked from the debate loop with proper input/output flow.
-
 ## Output and Logging Tasks
 
 ### Task 16 - Comprehensive Logger

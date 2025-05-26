@@ -211,27 +211,27 @@ class AgentStateTracker:
 _MERGE_PROMPT = """### TASK: Merge and deduplicate belief bullets
 You will receive two unordered lists of concise belief statements.
 
-• **EXISTING** – the agent’s current belief bullets  
-• **NEW**       – bullets extracted from the latest message
+• **EXISTING** - the agent's current belief bullets  
+• **NEW**       - bullets extracted from the latest message
 
 Actions:
 
 1. Compare every NEW bullet against all EXISTING bullets.  
-   – Two bullets are “duplicates” if they assert the **same core idea** (wording may differ).  
-   – Treat near‑synonyms or paraphrases as duplicates.
+   - Two bullets are “duplicates” if they assert the **same core idea** (wording may differ).  
+   - Treat near-synonyms or paraphrases as duplicates.
 
 2. Build a **single final list** that contains  
    • every EXISTING bullet not similar
    • similar MERGED bullets from NEW
    • and any NEW bullets that are not duplicates of EXISTING.
    
-3. Write the final list as Markdown bullets, one idea per line, ≤ 20 words each.  
+3. Write the final list as Markdown bullets, one idea per line, ≤ 20 words each.  
    *Do not output any other text, labels, or commentary.*
 
 ### OUTPUT FORMAT (example)
 
 • Humans excel at empathy and complex judgment.  
-• AI will automate repetitive data‑entry jobs.  
+• AI will automate repetitive data-entry jobs.  
 • Universal Basic Income should cushion workers during the AI transition.
 """
 
@@ -249,7 +249,7 @@ Your job:
 Constraints:
 - DO NOT quote the original wording verbatim; paraphrase succinctly.
 - One belief per bullet—no compound bullets.
-- No contradictions inside the list (if contradictory claims appear, ask for clarification).
+- No contradictions inside the list.
 - Return **only** the bullet list; no explanations, no numbering, no extra text.
 
 ### OUTPUT FORMAT
