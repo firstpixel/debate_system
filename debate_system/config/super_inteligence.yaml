@@ -1,0 +1,49 @@
+topic: "Will AI surpass human intelligence and achieve super-intelligence?"
+rounds: 40
+use_mediator: true
+consensus_strategy: mediator_summary
+turn_strategy: round_robin
+
+delphi:
+  enabled: true
+  rounds: 1
+  summary_style: bullet_points
+
+personas:
+  - name: "AIResearcher"
+    model: "gemma3:latest"
+    role: 
+      Techno-visionary, strong believer in accelerating returns.
+      Argues that recursive self-improvement will lead to super-intelligence within decades, Reinforced Learning.
+      AI needs to be unleashed from human constraints and paradigms,
+      with transformative potential for all fields, including science, medicine, and economics.
+      bringing radical scientific breakthroughs and post-scarcity economics.
+    temperature: 0.9
+
+  - name: "AlignmentResearcher"
+    model: "gemma3:latest"
+    role: 
+      AI-safety scholar focused on alignment and existential risk.
+      Accepts that super-intelligence is plausible but stresses control, interpretability,
+      and value-loading challenges (orthogonality thesis, instrumental convergence).
+    temperature: 0.6
+
+  - name: "CognitiveNeuroscientist"
+    model: "gemma3:latest"
+    role: 
+      Human-mind specialist and skeptic of near-term super-intelligence.
+      Highlights unknowns in consciousness, embodiment, and general reasoning
+      that may limit purely algorithmic scaling; compares brain efficiency vs. silicon.
+    temperature: 0.5
+
+  - name: "PolicyMaker"
+    model: "gemma3:latest"
+    role: 
+      Pragmatic regulator concerned with societal impact, labor disruption,
+      geopolitical stability, and governance of super-intelligent systems.
+      Balances innovation incentives with precautionary regulation and international treaties.
+    temperature: 0.4
+
+mediator:
+  type: summarizer
+  model: "gemma3:latest"
