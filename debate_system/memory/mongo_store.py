@@ -29,6 +29,10 @@ class STMStore:
         cursor = self.collection.find({"agent_id": agent_id}).sort("timestamp", 1)
         return list(cursor)
 
+    def get_all_turns_all_agents(self) -> List[Dict]:
+        cursor = self.collection.find({}).sort("timestamp", 1)
+        return list(cursor)
+
     def summarize_turns(self, agent_id: str, full_text: str) -> str:
         return full_text[:1000] + "..." if len(full_text) > 1000 else full_text
 

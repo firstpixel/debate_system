@@ -190,14 +190,40 @@ class AgentStateTracker:
         
         
     def get_total_rounds(self) -> int:
-        # Suppose self.stm is a list of all messages in order
-        return len(self.stm)
+        all_msgs = self.memory.stm.get_all_turns_all_agents()
+        agent_ids = {msg.get("agent_id") for msg in all_msgs if "agent_id" in msg}
+        if agent_ids:
+            return len(all_msgs) // len(agent_ids)
+        return len(all_msgs)
 
     def get_summary_of_rounds(self, start: int, end: int) -> str:
-        # Summarize messages from self.stm[start-1:end]
-        # For now, just join their content as a placeholder
-        relevant = self.stm[start-1:end]
-        return "\n".join(msg["content"] for msg in relevant)
+        all_msgs = self.memory.stm.get_all_turns_all_agents()
+        relevant = all_msgs[start-1:end]
+        if not relevant:
+            return "No messages in this range."
+
+        # Format conversation with speaker attribution
+        conversation = "\n".join(
+            (
+                f"assistent: {msg.get('message', '')}" if msg.get("agent_id") == self.agent_name
+                else f"{msg.get('agent_id', 'other')}: {msg.get('message', '')}"
+            )
+            for msg in relevant
+        )
+
+        prompt = [
+            {
+                "role": "system",
+                "content": (
+                    "Summarize the following debate turns in 3-5 concise bullet points, "
+                    "preserving who said what using the speaker labels as shown (assistent: or agent_name:). "
+                    "Focus on key arguments and ideas. Do not include speaker names not present in the text."
+                )
+            },
+            {"role": "user", "content": conversation}
+        ]
+        summary = self.llm.chat(prompt)
+        return summary
 
 # -------------------------------------------------------------------------
 # Prompt constants
