@@ -2,7 +2,7 @@ from typing import List, Dict
 from app.core_llm import LLMClient
 
 class DelphiEngine:
-    def __init__(self, model: str = "gemma3:latest", temperature: float = 0.3):
+    def __init__(self, model: str = "gemma3:latest", temperature: float = 0.2):
         self.llm = LLMClient(model=model, temperature=temperature)
 
     def run_consensus_round(self, agent_inputs: List[str], agents_num: int = 2) -> Dict:

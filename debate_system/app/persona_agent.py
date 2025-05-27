@@ -97,7 +97,8 @@ Debate topic: "{topic}".
         user_prompt: str,
         opponent_argument: str = "",
         topic: str = "",
-        stream_callback: Optional[Callable[[str], None]] = None
+        stream_callback: Optional[Callable[[str], None]] = None,
+        debate_history: Optional[list] = None  # New argument
     ) -> str:
 
         logger.info(f"########### Agent {self.name} interacting with prompt: {user_prompt}")
@@ -121,13 +122,14 @@ Debate topic: "{topic}".
         context_messages = self.context_builder.build_context_messages(
             agent_name=self.name,
             tracker=self.agent_state_tracker,
-            mode="default"
+            mode="default",
+            debate_history=debate_history  # Pass debate_history to context builder
         )
 
        
 
         messages = [{"role": "system", "content": self.system_prompt}]
-        messages.extend(context_messages)  # Use extend instead of append for lists
+        messages.extend(context_messages) 
 
         messages.append({"role": "user", "content": user_prompt + "\nOpponent arguments: " + opponent_argument})
 

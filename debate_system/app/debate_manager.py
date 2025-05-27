@@ -181,7 +181,8 @@ class DebateManager:
                     user_prompt=prompt,
                     opponent_argument=opponent_last,
                     topic=topic,
-                    stream_callback=stream_to_ui
+                    stream_callback=stream_to_ui,
+                    debate_history=self.debate_history  # Pass full debate history
                 )
 
                 # Realtime feedback to Streamlit

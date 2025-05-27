@@ -25,32 +25,8 @@ class ContextBuilder:
         # Get context length from environment or use default
         self.context_length = int(os.environ.get("OLLAMA_CONTEXT_LENGTH", DEFAULT_CONTEXT_LENGTH))
         self.response_reserve = int(os.environ.get("RESPONSE_RESERVE_TOKENS", DEFAULT_RESPONSE_RESERVE))
-        
-        # Default distribution ratios (can be adjusted)
-        self.distribution_ratios = {
-            "beliefs": 0.15,      # 15% for belief state
-            "stm": 0.40,          # 40% for short-term memory
-            "ltm": 0.15,          # 15% for long-term memory
-            "rag": 0.15,          # 15% for RAG context
-            "system": 0.05,       # 5% for system message
-            "reserves": 0.10      # 10% reserve for flexibility
-        }
-        
-        # These can be customized based on context_scope
-        if context_scope == "belief-focused":
-            self.distribution_ratios.update({
-                "beliefs": 0.40, "stm": 0.25, "ltm": 0.10, "rag": 0.10
-            })
-        elif context_scope == "rag-enhanced":
-            self.distribution_ratios.update({
-                "beliefs": 0.10, "stm": 0.25, "ltm": 0.10, "rag": 0.40
-            })
-        elif context_scope == "full":
-            self.distribution_ratios.update({
-                "beliefs": 0.15, "stm": 0.30, "ltm": 0.25, "rag": 0.15
-            })
 
-    def build_context_messages(self, agent_name: str, tracker: AgentStateTracker, mode: str = "default") -> List[Dict]:
+    def build_context_messages(self, agent_name: str, tracker: AgentStateTracker, mode: str = "default", debate_history: Optional[list] = None) -> List[Dict]:
         """
         Constructs the full message history for the LLM:
           - Adds a summary of all rounds except the last 5 (if available)
@@ -60,46 +36,59 @@ class ContextBuilder:
         messages = []
         available_tokens = self.context_length - self.response_reserve
 
-        # Calculate token allocations
-        token_allocations = self._calculate_token_allocations(available_tokens)
-        logger.info(f"Context allocations for {agent_name}: {token_allocations}")
-
-        # 1. Add summary of all rounds except the last 5
-        if hasattr(tracker, "get_total_rounds") and hasattr(tracker, "get_summary_of_rounds"):
-            total_rounds = tracker.get_total_rounds()
+        # Use debate_history if provided, else fallback to tracker
+        if debate_history is not None:
+            # 1. Add summary of all rounds except the last 5 (if available)
+            total_rounds = max([m.get("round", 0) for m in debate_history] or [0])
             if total_rounds > 5:
-                summary = tracker.get_summary_of_rounds(1, total_rounds - 5)
+                summary_msgs = [m for m in debate_history if m.get("round", 0) <= total_rounds - 5]
+                summary = "\n".join(f"{m['agent']}: {m['content']}" for m in summary_msgs)
                 if summary:
                     messages.append({
                         "role": "user",
                         "content": f"Summary of rounds 1 to {total_rounds - 5}:\n{summary}"
                     })
-
-        # 2. Add previous 5 messages from all agents, with correct roles
-        if hasattr(tracker, "get_recent_messages"):
-            recent_messages = tracker.get_recent_messages(limit=5)
-            for msg in recent_messages:
-                speaker = msg.get("speaker", "")
+            # 2. Add previous 5 messages from all agents
+            recent_msgs = debate_history[-5:] if len(debate_history) >= 5 else debate_history
+            for msg in recent_msgs:
+                speaker = msg.get("agent", "")
                 content = msg.get("content", "")
-                # Set role: 'user' if this is the requesting agent, else 'assistant'
                 role = "user" if speaker == agent_name else "assistant"
                 messages.append({
                     "role": role,
                     "content": content
                 })
+        else:
+            # Fallback to tracker-based context (legacy)
+            # 1. Add summary of all rounds except the last 5
+            if hasattr(tracker, "get_total_rounds") and hasattr(tracker, "get_summary_of_rounds"):
+                total_rounds = tracker.get_total_rounds()
+                if total_rounds > 5:
+                    summary = tracker.get_summary_of_rounds(1, total_rounds - 5)
+                    if summary:
+                        messages.append({
+                            "role": "user",
+                            "content": f"Summary of rounds 1 to {total_rounds - 5}:\n{summary}"
+                        })
+
+            # 2. Add previous 5 messages from all agents, with correct roles
+            if hasattr(tracker, "get_recent_messages"):
+                recent_messages = tracker.get_recent_messages(limit=5)
+                for msg in recent_messages:
+                    speaker = msg.get("speaker", "")
+                    content = msg.get("content", "")
+                    # Set role: 'user' if this is the requesting agent, else 'assistant'
+                    role = "user" if speaker == agent_name else "assistant"
+                    messages.append({
+                        "role": role,
+                        "content": content
+                    })
 
         # Log final context size
         total_tokens = sum(self._estimate_tokens(m["content"]) for m in messages)
         logger.info(f"Final context size for {agent_name}: ~{total_tokens} tokens")
 
         return messages
-
-    def _calculate_token_allocations(self, available_tokens: int) -> Dict[str, int]:
-        """Calculate token allocations based on distribution ratios and available tokens."""
-        allocations = {}
-        for key, ratio in self.distribution_ratios.items():
-            allocations[key] = int(available_tokens * ratio)
-        return allocations
     
     def _estimate_tokens(self, text: str) -> int:
         """Rough estimation of tokens in text (4 chars ~= 1 token for English text)."""
