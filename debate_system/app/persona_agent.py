@@ -19,78 +19,29 @@ class PersonaAgent:
         self.model = model
         self.llm = LLMClient(model=self.model, temperature=self.temperature)
 
-        self.tracker = AgentStateTracker(agent_name=name, model=model, temperature=temperature)
+        self.agent_state_tracker = AgentStateTracker(agent_name=name, model=model, temperature=temperature)
         self.bayesian_tracker = None
         self.context_builder = None
         self.perf_logger = None
         self.contradiction_checker = ContradictionDetector()
 
     def _compose_system_prompt(self, topic: str, opponent_argument: str = "") -> str:
-        beliefs = self.tracker.memory_cache["beliefs"]
-        contradiction_warning = self.tracker.last_contradiction()
-
-#         prompt = (
-#             f"""
-# You are {self.name}, acting as a {self.role} in a formal debate.
-# Debate topic: "{topic}".
-
-# **Debate Protocol (follow strictly):**
-
-# 1. **Length & Structure**
-#    • Max 500 tokens per turn.  
-#    • Begin with a one-sentence *definition* of any key term you'll rely on.
-#    • Answer opponent's questions directly.
-#    • Provide solutions to opponent's inquires, keeping your beliefs.
-#    • Then supply up to **3 numbered points** (≤40 tokens each).
-#    • Keep track of your definitions and points, and refer to them as needed.
-#    • End with:  
-#      - one concrete policy or experiment suggestion, provide details on possible benefits, expected results and outcomes
-#      - **one direct question** for your opponent.
-
-# 2. **Steel-man Rule**
-#    • *Before* rebutting, restate your opponent's strongest recent point in ≤40 tokens and concede any part you find reasonable.
-
-# 3. **Evidence**
-#    • For every factual claim include a parenthetical citation hint, try to find evidence from the last 5 years.:  
-#      Example: `(study: {{source}} {{year}} {{report_name}})`.
-#     • If you can't find evidence, say so and use reasoning to prove the claim. `if a is true, then b is true.`
-
-# 4. **Tone & Language**
-#    • No ad-hominem, motive-ascription, or loaded adjectives (e.g., “delusional,” “nihilistic”).  
-#    • First-person singular (“I”) and professional tone.  
-#    • Use plain language; avoid rhetorical flourishes, stage directions, and dramatic parentheses.
-#    • Make your argument clear and concise, avoiding unnecessary jargon.
-#    • Avoid repeating phrases or ideas from previous turns, unless it's from opponent's argument.
-
-# 5. **Progress Checkpoint**
-#    • After two full exchanges on the same sub-topic, pivot: introduce *new* evidence or propose synthesis.
-
-# 6. **Failure Modes—avoid:**  
-#    • Repetition of phrases across turns.  
-#    • Over 10% duplicate tokens with previous output (n-gram overlap >4).  
-#    • Vacuous “I agree/disagree” without novel reasoning.
-#    • Remember to focus on the debate, delphi is just to help, do not mention it.
-#    • Do not focus on delphi summary, use it to guide the debate without mentining it.
-
-# 7. **Beliefs, Contradictions and Coherence**
-#    • Anchor your answers on your past positions, and do not contradict your beliefs.
-#    • Keep your self coherent
-#    • Prevent contradictions by checking your beliefs, do not contradict your beliefs.
-# """
-#         )
+        beliefs = self.agent_state_tracker.memory_cache["beliefs"]
+        contradiction_warning = self.agent_state_tracker.last_contradiction()
 
         prompt = f"""
-You are {self.name}, acting as a {self.role} in a formal debate.
+You are {self.name}, acting role as a {self.role} in a formal debate.
 Debate topic: "{topic}".
 
 **Debate Protocol (follow strictly):**
 
+**Rules for Debate:**
 1. **Length & Structure**
-• ≤ 400 tokens in total.  
+• ≤ 500 tokens in total.  
 • **Order matters:**  
     ➀ *Definition* (1 sentence, ≤ 25 tokens).  
     ➁ *Steel-man* of opponent’s best point (≤ 40 tokens, see Rule 2). Find gaps, use it on *One direct question* if needed. 
-    ➂ *Direct answers* to any questions.  
+    ➂ *Direct answers* to any questions.
     ➃ Up to **3 numbered points** (start with “1.”, “2.”, …; each ≤ 40 tokens).  
     ➄ *Policy / experiment suggestion* **with** expected benefits + measurable outcomes.  
     ➅ *One direct question* for opponent.  
@@ -99,6 +50,7 @@ Debate topic: "{topic}".
 2. **Steel-man Rule**
 • Begin every turn with the Steel-man summary (step ➁ above) **before** any rebuttal.  
 • Concede any part you find reasonable in ≤ 40 tokens.
+• If you disagree, explain why in ≤ 40 tokens, and propose a intermediate adjustment to the opponent's argument.
 
 3. **Evidence**
 • For every factual claim include a parenthetical citation hint, try to find evidence from the last 5 years.:  
@@ -108,23 +60,24 @@ Debate topic: "{topic}".
 4. **Tone & Language**
 • Professional, first-person singular.  
 • No ad hominem or loaded adjectives.  
-• Avoid stock phrases like “I find your framing…”. Vary wording each turn.  
+• Avoid stock phrases like “I find your framing…”. VARY WORDING EACH TURN.  
 • Plain language; no rhetorical flourishes.
+• Be very direct and concise in your responses.
 
 5. **Progress Checkpoint**
 • After two exchanges on the same sub-topic, pivot: introduce *new* evidence or propose a synthesis.
 
 6. **Failure Modes—avoid:**  
 • >10 % duplicate tokens with any previous turn (n-gram > 4).  
-• Exceeding 3 numbered points or 40 tokens per point.  
+• Exceeding 3 numbered points or 50 tokens per point.  
 • Mentioning “Delphi” or summarising the whole debate mid-turn.
 
 7. **Beliefs, Contradictions & Coherence**
-• Stay consistent with your past positions; do not contradict yourself.
+• Stay consistent with your past positions; DO NOT contradict yourself.
 • Explicitly cross-check before submitting.
-• Anchor your answers on your past positions, and do not contradict your beliefs.
-• Keep your self coherent.
-• Prevent contradictions by checking your beliefs, do not contradict your beliefs.
+• Anchor your answers on your past positions, and DO NOT contradict your beliefs.
+• Keep your self coherent to your ROLE.
+• Prevent contradictions by checking your BELIEFS, DO NOT contradict your beliefs.
 
 """
 
@@ -132,8 +85,8 @@ Debate topic: "{topic}".
         if contradiction_warning:
             prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
 
-        # if opponent_argument:
-        #     prompt += f"\n## Your Opponent's Last Statement:\n> {opponent_argument.strip()}"
+        if opponent_argument:
+            prompt += f"\n## Your Opponent's Last Statement:\n> {opponent_argument.strip()}"
 
         prompt += f"\n## Your Current Beliefs:\n{beliefs.strip()}"
         
@@ -143,7 +96,6 @@ Debate topic: "{topic}".
         self,
         user_prompt: str,
         opponent_argument: str = "",
-        debate_history: List[Dict] = [],
         topic: str = "",
         stream_callback: Optional[Callable[[str], None]] = None
     ) -> str:
@@ -168,7 +120,7 @@ Debate topic: "{topic}".
 
         context_messages = self.context_builder.build_context_messages(
             agent_name=self.name,
-            tracker=self.tracker,
+            tracker=self.agent_state_tracker,
             mode="default"
         )
 
@@ -198,10 +150,10 @@ Debate topic: "{topic}".
             self.perf_logger.log_turn(self.name, end - start)
 
         # Update belief memory
-        self.tracker.save_belief(response)
+        self.agent_state_tracker.save_belief(response)
 
         # Save the complete message to STM
-        self.tracker.save_message_to_stm(response, speaker=self.name)
+        self.agent_state_tracker.save_message_to_stm(response, speaker=self.name)
 
         # Optionally identify and save important parts to LTM
         important_parts = self._extract_important_info(response)

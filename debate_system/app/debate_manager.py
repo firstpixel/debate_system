@@ -62,14 +62,14 @@ class DebateManager:
                 model=persona.get("model", "gemma3:latest"),
             )
             self.agents.append(agent)
-            self.agent_trackers[agent.name] = agent.tracker
+            self.agent_trackers[agent.name] = agent.agent_state_tracker
 
         # Now safe to initialize BayesianTracker with all trackers
-        self.tracker = BayesianTracker(agent_trackers=self.agent_trackers)
+        self.bayesian_tracker = BayesianTracker(agent_trackers=self.agent_trackers)
 
         # Attach tracker/log after it's fully constructed
         for agent in self.agents:
-            agent.bayesian_tracker = self.tracker
+            agent.bayesian_tracker = self.bayesian_tracker
             agent.contradiction_log = self.contradiction_log
 
         self.flow_controller = FlowController(
@@ -105,10 +105,10 @@ class DebateManager:
                 agent = next(a for a in self.agents if a.name == selected_name)
                 
                 # Update priority scores before next agent selection if using priority strategy
-                # if self.config.get("turn_strategy") == "priority":
-                #     print(f"Using priority strategy. Current scores: {self.tracker.get_scores()}")
-                #     self.flow_controller.update_scores(self.tracker.get_scores())
-                #     print(f"Updated priority order: {self.flow_controller._priority_order}")
+                if self.config.get("turn_strategy") == "priority":
+                    print(f"Using priority strategy. Current scores: {self.bayesian_tracker.get_scores()}")
+                    self.flow_controller.update_scores(self.bayesian_tracker.get_scores())
+                    print(f"Updated priority order: {self.flow_controller._priority_order}")
 
                 # Track which agents have spoken in this round to avoid duplicates
                 if not hasattr(self, '_round_speakers'):
@@ -180,7 +180,6 @@ class DebateManager:
                 response = agent.interact(
                     user_prompt=prompt,
                     opponent_argument=opponent_last,
-                    debate_history=self.debate_history,
                     topic=topic,
                     stream_callback=stream_to_ui
                 )
@@ -192,7 +191,7 @@ class DebateManager:
                 
 
                 # Track this agent's turn for conflict detection later
-                self.tracker.track_turn(agent=agent.name, message=response, topic=topic)
+                self.bayesian_tracker.track_turn(agent=agent.name, message=response, topic=topic)
 
                 self.debate_history.append({
                     "round": round_num + 1,
@@ -313,11 +312,11 @@ class DebateManager:
             strategy=self.config.get("consensus_strategy", "mediator_summary")
         )
         with open(f"logs/{self.session_id}_contradictions.md", "w") as f:
-            f.write(self.tracker.export_logs())
+            f.write(self.bayesian_tracker.export_logs())
 
         consensus = engine.generate_consensus(
             agents=[a.name for a in self.agents],
-            agent_states={a.name: a.tracker for a in self.agents},
+            agent_states={a.name: a.agent_state_tracker for a in self.agents},
             transcript=self.debate_history,
             graph=self.argument_graph
         )
@@ -332,7 +331,7 @@ class DebateManager:
         audit_summary = tester.analyze(
             session_id=self.session_id,
             consensus=self.final_summary,
-            tracker=self.tracker,
+            tracker=self.bayesian_tracker,
             graph=self.argument_graph
         )
 
