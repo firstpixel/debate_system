@@ -159,7 +159,7 @@ Debate topic: "{topic}".
         important_parts = self._extract_important_info(response)
         if important_parts:
             for part in important_parts:
-                self.tracker.save_to_ltm(part)
+                self.agent_state_tracker.save_to_ltm(part)
                 
         refinement_system_prompt = """"Create a more fluid text from the following points,
         without changing the meaning. Use a more natural language and make it sound like a human wrote it. 
