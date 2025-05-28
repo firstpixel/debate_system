@@ -21,113 +21,91 @@ class ContextBuilder:
         self.topic = topic
         self.context_scope = context_scope
         self.window_size = window_size
-        
-        # Get context length from environment or use default
         self.context_length = int(os.environ.get("OLLAMA_CONTEXT_LENGTH", DEFAULT_CONTEXT_LENGTH))
         self.response_reserve = int(os.environ.get("RESPONSE_RESERVE_TOKENS", DEFAULT_RESPONSE_RESERVE))
 
-    def build_context_messages(self, agent_name: str, tracker: AgentStateTracker, mode: str = "default", debate_history: Optional[list] = None) -> List[Dict]:
+    def build_context_messages(self, agent_name: str, tracker: AgentStateTracker, mode: str = "default") -> List[Dict]:
         """
-        Constructs the full message history for the LLM:
-          - Adds a summary of all rounds except the last 5 (if available)
-          - Adds the previous 5 messages from all agents
+        Constructs the full message history for the LLM, enforcing token limits:
+          - Adds a summary of all rounds except the last 3 per persona (if available)
+          - Adds the previous 3 messages from each persona (full messages)
           - Sets role: 'user' for the requesting agent, 'assistant' for others
         """
         messages = []
         available_tokens = self.context_length - self.response_reserve
 
-        # Use debate_history if provided, else fallback to tracker
-        if debate_history is not None:
-            # 1. Add summary of all rounds except the last 5 (if available)
-            total_rounds = max([m.get("round", 0) for m in debate_history] or [0])
-            if total_rounds > 5:
-                summary_msgs = [m for m in debate_history if m.get("round", 0) <= total_rounds - 5]
-                summary = "\n".join(f"{m['agent']}: {m['content']}" for m in summary_msgs)
-                if summary:
-                    messages.append({
-                        "role": "user",
-                        "content": f"Summary of rounds 1 to {total_rounds - 5}:\n{summary}"
-                    })
-            # 2. Add previous 5 messages from all agents
-            recent_msgs = debate_history[-5:] if len(debate_history) >= 5 else debate_history
-            for msg in recent_msgs:
-                speaker = msg.get("agent", "")
-                content = msg.get("content", "")
-                role = "user" if speaker == agent_name else "assistant"
-                messages.append({
-                    "role": role,
-                    "content": content
-                })
+        # Gather all messages from STM only
+        if hasattr(tracker, "memory") and hasattr(tracker.memory.stm, "get_all_turns_all_agents"):
+            all_msgs = tracker.memory.stm.get_all_turns_all_agents()
         else:
-            # Fallback to tracker-based context (legacy)
-            # 1. Add summary of all rounds except the last 5
-            if hasattr(tracker, "get_total_rounds") and hasattr(tracker, "get_summary_of_rounds"):
-                total_rounds = tracker.get_total_rounds()
-                if total_rounds > 5:
-                    summary = tracker.get_summary_of_rounds(1, total_rounds - 5)
-                    if summary:
-                        messages.append({
-                            "role": "user",
-                            "content": f"Summary of rounds 1 to {total_rounds - 5}:\n{summary}"
-                        })
+            all_msgs = []
 
-            # 2. Add previous 5 messages from all agents, with correct roles
-            if hasattr(tracker, "get_recent_messages"):
-                recent_messages = tracker.get_recent_messages(limit=5)
-                for msg in recent_messages:
-                    speaker = msg.get("speaker", "")
-                    content = msg.get("content", "")
-                    # Set role: 'user' if this is the requesting agent, else 'assistant'
-                    role = "user" if speaker == agent_name else "assistant"
-                    messages.append({
-                        "role": role,
-                        "content": content
-                    })
+        # Group messages by agent
+        from collections import defaultdict, deque
+        persona_msgs = defaultdict(deque)
+        for msg in all_msgs:
+            agent = msg.get("agent_id")
+            if agent and msg.get("message"):
+                persona_msgs[agent].append(msg)
 
-        # Log final context size
-        total_tokens = sum(self._estimate_tokens(m["content"]) for m in messages)
+        # For each persona, keep only the last 3 messages
+        last_msgs = []
+        for persona, msgs in persona_msgs.items():
+            last_msgs.extend(list(msgs)[-3:])
+
+        # Sort last_msgs by their order in all_msgs
+        last_msgs = sorted(last_msgs, key=lambda m: all_msgs.index(m))
+        last_msg_ids = set(id(m) for m in last_msgs)
+
+        persona_count = len(persona_msgs)
+        # Only build and add summary if every persona has at least 3 messages and total messages > persona_count * 3
+        if all(len(msgs) >= 3 for msgs in persona_msgs.values()) and len(all_msgs) > persona_count * 3:
+            # The rest are for summary
+            summary_msgs = [m for m in all_msgs if id(m) not in last_msg_ids]
+
+            # Build the summary string in the requested format
+            summary_lines = []
+            for m in summary_msgs:
+                agent = m.get("agent_id")
+                # Use summary if present, else fall back to content
+                content = m.get("summary")
+                if agent == agent_name:
+                    summary_lines.append(f"I: {content}")
+                else:
+                    summary_lines.append(f"{agent}: {content}")
+            summary_str = "\n".join(summary_lines)
+            if summary_str:
+                messages.append({
+                    "role": "assistant",
+                    "content": f"Summary of conversation so far:\n{summary_str}"
+                })
+
+        # Add the last 3 messages per persona as full messages, with correct roles
+        for m in last_msgs:
+            agent = m.get("agent_id")
+            content = m.get("message", "")
+            role = "assistant" if agent == agent_name else "user"
+            messages.append({
+                "role": role,
+                "content": content
+            })
+
+        # Enforce token limit
+        total_tokens = 0
+        limited_messages = []
+        for m in messages:
+            msg_tokens = self._estimate_tokens(m["content"])
+            if total_tokens + msg_tokens > available_tokens:
+                break
+            limited_messages.append(m)
+            total_tokens += msg_tokens
+
         logger.info(f"Final context size for {agent_name}: ~{total_tokens} tokens")
+        return limited_messages
 
-        return messages
-    
     def _estimate_tokens(self, text: str) -> int:
         """Rough estimation of tokens in text (4 chars ~= 1 token for English text)."""
         return len(text) // 4
-    
-        
-    def _get_recent_messages_within_limit(
-        self, tracker: AgentStateTracker, agent_name: str, token_limit: int
-    ) -> List[Dict]:
-        """Get summarized short-term memory within token limit."""
-        
-        
-        # Fall back to original approach for shorter conversations or other scopes
-        all_turns = tracker.get_recent_messages(limit=self.window_size)
-        
-        result = []
-        tokens_used = 0
-        
-        for msg in all_turns:
-            # Extract content and determine role
-            content = msg.get("content", "")
-            role = msg.get("role", "user")  # Default to user if role not specified
-            
-            # Calculate token usage
-            msg_tokens = self._estimate_tokens(content)
-            
-            if tokens_used + msg_tokens <= token_limit:
-                result.append({
-                    "role": role,
-                    "content": content
-                })
-                tokens_used += msg_tokens
-            else:
-                # If we can't fit any more full messages, break
-                break
-            
-        return result
-
-
 
     def _get_system_prompt_for_mode(self, mode: str) -> str:
         if mode == "judge":
@@ -149,3 +127,19 @@ class ContextBuilder:
         if mode in {"judge", "delphi"}:
             return "user"
         return "assistant" if speaker_name == agent_name else "user"
+
+    # For compatibility with tests and legacy code
+    def build_prompt(self, agent_name: str, agent_role: str, last_turns: list, tracker: AgentStateTracker) -> List[Dict]:
+        """
+        Legacy/test compatibility: builds a prompt with a system message and user turns.
+        """
+        system_prompt = f"You are {agent_name}, role: {agent_role}. Debate context: {self.topic}"
+        messages = [
+            {"role": "system", "content": system_prompt}
+        ]
+        # Add last turns as user messages
+        for msg in last_turns:
+            messages.append({
+                "role": "user", "content": f"{msg['agent']}: {msg['content']}"
+            })
+        return messages

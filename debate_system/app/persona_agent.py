@@ -103,12 +103,6 @@ Debate topic: "{topic}".
 
         logger.info(f"########### Agent {self.name} interacting with prompt: {user_prompt}")
         
-        # Save user prompt to STM
-        #self.tracker.save_message_to_stm(user_prompt, speaker="User")
-        
-        # Save opponent's argument to STM if provided
-        #if opponent_argument:
-        #    self.tracker.save_message_to_stm(opponent_argument, speaker="Opponent")
 
         self.system_prompt = self._compose_system_prompt(topic, opponent_argument)
 
@@ -122,8 +116,7 @@ Debate topic: "{topic}".
         context_messages = self.context_builder.build_context_messages(
             agent_name=self.name,
             tracker=self.agent_state_tracker,
-            mode="default",
-            debate_history=debate_history  # Pass debate_history to context builder
+            mode="default"
         )
 
        
@@ -155,7 +148,7 @@ Debate topic: "{topic}".
         self.agent_state_tracker.save_belief(response)
 
         # Save the complete message to STM
-        self.agent_state_tracker.save_message_to_stm(response, speaker=self.name)
+        self.agent_state_tracker.memory.add_turn(self.name, response)
 
         # Optionally identify and save important parts to LTM
         important_parts = self._extract_important_info(response)
@@ -164,7 +157,8 @@ Debate topic: "{topic}".
                 self.agent_state_tracker.save_to_ltm(part)
                 
         refinement_system_prompt = """"Create a more fluid text from the following points,
-        without changing the meaning. Use a more natural language and make it sound like a human wrote it. 
+        without changing the meaning. Use a more natural language and make it sound like a human wrote it, make smooth text, fluid to read, keeping paragraphs and pauses when necessary. 
+        You are {self.name}, acting role as a {self.role} in a formal debate.
         DO NOT mention it, just return the fluid text. Do not add any extra information or context."""
 
         logger.debug(f"[{self.name}] Response: {response}")

@@ -12,12 +12,14 @@ class STMStore:
         self.db = self.client[DB_NAME]
         self.collection = self.db["short_term_memory"]
 
-    def store_turn(self, agent_id: str, message: str) -> str:
+    def store_turn(self, agent_id: str, message: str, summary: str = None) -> str:
         doc = {
             "agent_id": agent_id,
             "message": message,
             "timestamp": datetime.utcnow()
         }
+        if summary is not None:
+            doc["summary"] = summary
         result = self.collection.insert_one(doc)
         return str(result.inserted_id)
 

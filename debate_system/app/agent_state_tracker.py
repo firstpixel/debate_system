@@ -106,30 +106,6 @@ class AgentStateTracker:
             "contradictions": len(contradictions)
         }
 
-    def save_message_to_stm(self, message: str, speaker: str = None) -> None:
-        """Save a message to short-term memory (STM)."""
-        if not speaker:
-            speaker = self.agent_name
-
-        # Check if message is already in JSON format (appears to be a string representation of a dict)
-        if message.startswith("{") and "agent_id" in message and "message" in message:
-            try:
-                import json
-                # Try to parse it as JSON
-                message_obj = json.loads(message)
-                actual_message = message_obj.get("message", message)
-                # Use the extracted message instead of the whole JSON string
-                message = actual_message
-            except json.JSONDecodeError:
-                # If it's not valid JSON, use the message as is
-                pass
-
-
-        # Save to MongoDB via memory manager
-        self.memory.stm.store_turn(self.agent_name, message)
-
-        logger.info(f"Saved message from {speaker} to STM for agent {self.agent_name}")
-
     def save_to_ltm(self, content: str, importance: float = 0.7) -> None:
         """Save important information to long-term memory (LTM)."""
         # Save to Qdrant via memory manager
