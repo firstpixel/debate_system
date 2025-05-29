@@ -107,12 +107,11 @@ class DebateManager:
 
         for round_num in range(rounds):
             print(f"\n🔁 Round {round_num + 1} / {rounds}")
-            
-            # Send round information to UI
             if feedback_callback:
-                feedback_callback("Round_Marker", f"## 🔁 Round {round_num + 1} / {rounds}")
+                feedback_callback("Round_Marker", f"## 🔁 Round {round_num + 1} / {rounds}", round_num + 1, 1)
 
             topic = self.config.get("topic", "")
+            sub_round1_order = []  # Track the order of agents in sub-round 1
             for _ in range(len(self.agents)):
                 # FlowController determines next agent
                 selected_name = self.flow_controller.next_turn({
@@ -123,29 +122,24 @@ class DebateManager:
 
                 # Always get the agent object before attempting to find an opponent
                 agent = next(a for a in self.agents if a.name == selected_name)
-                
-                # Update priority scores before next agent selection if using priority strategy
-                if self.config.get("turn_strategy") == "priority":
-                    print(f"Using priority strategy. Current scores: {self.bayesian_tracker.get_scores()}")
-                    self.flow_controller.update_scores(self.bayesian_tracker.get_scores())
-                    print(f"Updated priority order: {self.flow_controller._priority_order}")
 
                 # Track which agents have spoken in this round to avoid duplicates
-                if not hasattr(self, '_round_speakers'):
+                if not hasattr(self, '_round_speakers') or round_num == 0 and _ == 0:
                     self._round_speakers = set()
-                
+
                 # Skip if this agent has already spoken in this round
                 if selected_name in self._round_speakers:
                     print(f"DEBUG Manager: Skipping {selected_name} as they already spoke in Round {round_num+1}")
                     continue
-                    
+
                 # Add agent to speakers for this round
                 self._round_speakers.add(selected_name)
-                
+                sub_round1_order.append(agent)  # Record the order only after confirming not already spoken
+
                 # Reset speakers at the end of the round
                 if len(self._round_speakers) >= len(self.agents):
                     self._round_speakers = set()
-                
+
                 # Fetch opponent's last statement
                 opponent = next((a for a in self.agents if a.name != agent.name), None)
                 opponent_last = next(
@@ -164,24 +158,24 @@ class DebateManager:
                 # Capture the current agent's name for the callback
                 current_agent_name = agent.name
                 
-                # Define stream callback that passes both agent name and token
-                def stream_to_ui(token):
+                # Define stream callback that passes both agent name and token, round, and sub_round
+                def stream_to_ui(token, sub_round=1):
                     nonlocal response
                     response += token
                     if feedback_callback:
-                        feedback_callback(current_agent_name, token, round_num + 1)
+                        feedback_callback(current_agent_name, token, round_num + 1, sub_round)
                         
                 print(f"Agent {agent.name} is interacting with prompt: {prompt}")
                 print(f"Opponent's last statement: {opponent_last}")
                 print(f"Debate history: {self.debate_history}")
                 
                 
-                response=""
+                # In sub-round 1:
                 response = agent.interact(
                     user_prompt=prompt,
                     opponent_argument=opponent_last,
                     topic=topic,
-                    stream_callback=stream_to_ui,
+                    stream_callback=lambda token: stream_to_ui(token, 1),
                     debate_history=self.debate_history,
                     sub_round=1
                 )
@@ -252,7 +246,7 @@ class DebateManager:
                         
                         # Show mediator's response in the UI
                         if feedback_callback:
-                            feedback_callback("Mediator", f"### 🧑‍⚖️ Mediator Intervention:\n{mediator_response}", round_num + 1)
+                            feedback_callback("Mediator", f"### 🧑‍⚖️ Mediator Intervention:\n{mediator_response}", round_num + 1, 1)
 
             #if round_num % 10 == 0 :
             # Run Delphi synthesis after all agents have spoken, if enabled in config
@@ -276,8 +270,8 @@ class DebateManager:
                 })
 
                 # # Optional: Show Delphi result on UI
-                #if feedback_callback:
-                #    feedback_callback("Delphi", "#### 🧠 Delphi Synthesis Result:\n" + delphi_output, round_num + 1)
+                # if feedback_callback:
+                #    feedback_callback("Delphi", "#### 🧠 Delphi Synthesis Result:\n" + delphi_output, round_num + 1, 1)
                     
                 
             else:
@@ -288,13 +282,24 @@ class DebateManager:
             # --- SUB-ROUND 2: cross-persona reconciliation pass ---
             # reset speaker-tracker for this sub-round
             self._round_speakers = set()
-            for agent in self.agents:
+            # Use sub_round1_order directly, as it is now guaranteed unique and ordered
+            for agent in sub_round1_order:
                 prompt = self.build_prompt(agent, round_num, sub_round=2, opponent_last=opponent_last, delphi_comment=delphi_comment, theme=theme)
+                response = ""
+                current_agent_name = agent.name
+                
+                # Define stream callback that passes both agent name and token, round, and sub_round
+                def stream_to_ui2(token, sub_round=1):
+                    nonlocal response
+                    response += token
+                    if feedback_callback:
+                        feedback_callback(current_agent_name, token, round_num + 1, sub_round)
+
                 response = agent.interact(
                     user_prompt=prompt,
                     opponent_argument=opponent_last,
                     topic=topic,
-                    stream_callback=stream_to_ui,
+                    stream_callback=lambda token: stream_to_ui2(token, 2),
                     debate_history=self.debate_history,
                     sub_round=2
                 )
@@ -308,13 +313,23 @@ class DebateManager:
             # --- OPTIONAL SUB-ROUND 3 if needed ---
             if self.needs_third_subround(self.debate_history, self.delphi_engine):
                 self._round_speakers = set()
-                for agent in self.agents:
+                for agent in sub_round1_order:
                     prompt = self.build_prompt(agent, round_num, sub_round=3, opponent_last=opponent_last, delphi_comment=delphi_comment, theme=theme)
+                    
+                    response = ""
+                    current_agent_name = agent.name
+                    # Define stream callback that passes both agent name and token, round, and sub_round
+                    def stream_to_ui3(token, sub_round=1):
+                        nonlocal response
+                        response += token
+                        if feedback_callback:
+                            feedback_callback(current_agent_name, token, round_num + 1, sub_round)
+                    
                     response = agent.interact(
                         user_prompt=prompt,
                         opponent_argument=opponent_last,
                         topic=topic,
-                        stream_callback=stream_to_ui,
+                        stream_callback=lambda token: stream_to_ui3(token, 3),
                         debate_history=self.debate_history,
                         sub_round=3
                     )
@@ -380,13 +395,13 @@ class DebateManager:
         
         # Send audit summary to UI
         if feedback_callback:
-            feedback_callback("Audit Report", f"## 📋 Final Tester Audit Report:\n{audit_summary}")
+            feedback_callback("Audit Report", f"## 📋 Final Tester Audit Report:\n{audit_summary}", None, 1)
 
 
 
 
 
-    def needs_third_subround(
+    def needs_third_subround(self,
         debate_history: List[Dict[str, Any]],
         delphi_engine: DelphiEngine,
         current_round: int = None,
@@ -444,9 +459,20 @@ class DebateManager:
         # count bullets in the “#### Consensus” section
         bullets = re.findall(r"^-", consensus_md, re.M)
 
-        # 7. If Delphi sees enough consensus bullets, we can skip sub-round 3
-        if len(bullets) >= min_convergence:
-            return False
+        # --- NEW: Append Delphi result to debate history for sub-round 2 ---
+        # Only append if a third sub-round will be needed (i.e., if we return True)
+        if len(bullets) < min_convergence:
+            # Find current round number
+            rounds = [e.get("round", 0) for e in debate_history]
+            current = current_round or max(rounds)
+            debate_history.append({
+                "round": current,
+                "sub_round": 2,
+                "agent": "Delphi",
+                "role": "Consensus Facilitator",
+                "content": result.get("raw_markdown", "")
+            })
+            return True
 
-        # otherwise we really need sub-round 3
-        return True
+        # 7. If Delphi sees enough consensus bullets, we can skip sub-round 3
+        return False

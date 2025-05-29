@@ -62,7 +62,7 @@ if st.session_state.cfg_text:
             # Track messages chronologically
             messages_chronological = []
             
-            def stream_feedback(agent_name: str, full_message: str, round_number: int = 1):
+            def stream_feedback(agent_name: str, full_message: str, round_number: int = 1, sub_round: int = 1):
                 if "messages_chronological" not in st.session_state:
                     st.session_state.messages_chronological = []
                 if "completed_rounds" not in st.session_state:
@@ -73,6 +73,7 @@ if st.session_state.cfg_text:
                     message_entry = {
                         "agent": agent_name,
                         "round_id": round_number,
+                        "sub_round": sub_round,
                         "text": full_message,
                         "box": feedback_container.empty()
                     }
@@ -87,6 +88,7 @@ if st.session_state.cfg_text:
                 message_entry = {
                     "agent": agent_name,
                     "round_id": round_number,
+                    "sub_round": sub_round,
                     "text": full_message,
                     "box": feedback_container.empty()
                 }
@@ -94,15 +96,15 @@ if st.session_state.cfg_text:
 
                 # ── Format and render the box ──
                 if agent_name == "Delphi":
-                    prefix = f"🧠 **Delphi Synthesis (Round {round_number})**:"
+                    prefix = f"🧠 **Delphi Synthesis (Round {round_number}.{sub_round})**:"
                 elif agent_name == "Mediator":
-                    prefix = f"🧑‍⚖️ **Mediator (Round {round_number})**:"
+                    prefix = f"🧑‍⚖️ **Mediator (Round {round_number}.{sub_round})**:"
                 elif agent_name == "Final Consensus":
                     prefix = "✅ **Final Consensus**:"
                 elif agent_name == "Audit Report":
                     prefix = "📋 **Audit Report**:"
                 else:
-                    prefix = f'🗣️ **{agent_name} (Round {round_number})**:'
+                    prefix = f'🗣️ **{agent_name} (Round {round_number}.{sub_round})**:'
 
                 message_entry["box"].markdown(f"{prefix} {full_message}")
 
@@ -110,8 +112,8 @@ if st.session_state.cfg_text:
                 if agent_name == "Delphi":
                     st.session_state.completed_rounds.append(True)
 
-            # Wrapper to extract round number from debate manager callback
-            def feedback_callback(agent_name, full_message, round_number=None):
+            # Wrapper to extract round number and sub_round from debate manager callback
+            def feedback_callback(agent_name, full_message, round_number=None, sub_round=1):
                 import re
                 if round_number is not None:
                     rn = round_number
@@ -120,7 +122,7 @@ if st.session_state.cfg_text:
                     rn = int(m.group(1)) if m else 1
                 else:
                     rn = len(st.session_state.completed_rounds) + 1
-                stream_feedback(agent_name, full_message, rn)
+                stream_feedback(agent_name, full_message, rn, sub_round)
 
             dm.start(feedback_callback=feedback_callback)
 

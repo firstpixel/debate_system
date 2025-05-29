@@ -1,5 +1,6 @@
 from typing import List, Dict
 from app.core_llm import LLMClient
+import re
 
 class DelphiEngine:
     def __init__(self, model: str = "gemma3:latest", temperature: float = 0.2):
@@ -39,7 +40,7 @@ class DelphiEngine:
 "   b. **Recommend Focused Sub-Round** on a specific contention.\n"
 "   c. **Call for Voting** if impasse persists after reframing.\n\n"
 
-"## Output Format (Markdown):\n"
+"## Output Format (Markdown) Follow strictly:\n"
 "### 1. Agreement\n"
 "- • …\n\n"
 "### 2. Disagreements\n"
@@ -80,22 +81,23 @@ class DelphiEngine:
         agent_responses = [r["content"] for r in round_history if r.get("agent") not in ("Delphi", "Consensus Facilitator", "mediator", None)]
         result = self.run_consensus_round(agent_responses, agents_num)
         # Return the raw markdown output for display
-        return result #.get("raw_markdown", "")
+        return result.get("raw_markdown", "")
 
     def _parse_output(self, markdown: str) -> Dict:
-
         result = {
             "raw_markdown": markdown,
             "consensus": ""
         }
 
-
-        if "#### Consensus" in markdown:
-            parts = markdown.split("#### Consensus")
-            if len(parts) > 1:
-                consensus_section = parts[1]
-                result["consensus"] = consensus_section.strip()
-
+        # Extract the '### 1. Agreement' section as consensus (matches system prompt)
+        match = re.search(r"### 1\. Agreement\n([\s\S]*?)(?=\n###|\n#|\Z)", markdown)
+        if match:
+            result["consensus"] = match.group(1).strip()
+        else:
+            # If not found, fallback to the first bullet list in the markdown
+            bullets = re.findall(r"^[-•]\s+.+", markdown, re.MULTILINE)
+            if bullets:
+                result["consensus"] = "\n".join(bullets)
         return result
 
     def join_last_items(self, items: list[str], n: int = 2) -> str:

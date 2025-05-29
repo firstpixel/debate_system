@@ -99,37 +99,42 @@ Debate topic: "{topic}".
         
         return prompt
 
-    def compose_system_prompt_second_sub_round(self, topic: str, opponent_argument: str = "", delphi_comment: str = "") -> str:
+    def _compose_system_prompt_second_sub_round(self, topic: str, opponent_argument: str = "", delphi_comment: str = "") -> str:
         beliefs = self.agent_state_tracker.memory_cache["beliefs"]
         contradiction_warning = self.agent_state_tracker.last_contradiction()
         
         prompt = f"""
-You are {self.name}, acting in your role as a {self.role} in a formal multi-persona debate.
+You are {self.name}, playing your role as a {self.role} in a structured multi-persona debate.
 Debate topic: "{topic}".
 
 **Second Sub-Round Protocol (follow strictly):**
 
-1. **Cross-Persona Perspective**  
-   • Summarize (in 2–3 bullets, ≤ 30 tokens each) the **key arguments** contributed so far by *all* personas (TechAdvocate, Ethicist, etc.), drawing on the Delphi synthesis.
+1. **Empathetic Re-evaluation**  
+   • Restate your own core proposal from Sub-Round 1 (≤ 30 tokens).  
+   • Then, *reframe* it as if you were your main opponent—how would *they* summarize your proposal? (≤ 30 tokens)
 
-2. **Antithesis**  
-   • Identify one core point of disagreement between any two personas (≤ 40 tokens).  
-   • Explain briefly why this disagreement persists (≤ 40 tokens).
+2. **Cross-Perspective Antithesis**  
+   • Identify one key objection your opponent would raise to your reframed position (≤ 40 tokens).  
+   • Explain why that objection still matters (≤ 40 tokens).
 
-3. **Synthesis**  
-   • Propose a **bridging argument** that combines elements from at least two personas’ views (1 numbered point, ≤ 40 tokens).  
-   • Show how this reconciliation addresses the antithesis above (≤ 40 tokens).
+3. **Reciprocal Synthesis**  
+   • Propose **one** joint modification that incorporates both your original view and the opponent’s objection (≤ 40 tokens).  
+   • Show how this joint proposal addresses the antithesis above (≤ 40 tokens).
 
-4. **Points of Convergence**  
-   • List up to **3 bullet items** where personas already agree (≤ 30 tokens each).
+4. **Shared Ground**  
+   • List up to **3 bullets** where your original view and your opponent’s reframed critique actually overlap (≤ 30 tokens each).
 
-5. **Narrowing Question**  
-   • End with *one direct question* aimed at resolving any remaining core tension.
+5. **Consensus-Seeking Question**  
+   • End with *one direct question* to your opponent that, if answered affirmatively, would signify we’re aligned on this modified proposal.
 
-6. **Output Format**  
-   • Use exactly the five numbered sections above—no extras.  
-   • Keep total response ≤ 500 tokens.
+**Formatting & Length:**  
+• Use exactly these five sections—no extras.  
+• Total response ≤ 300 tokens.  
+• Neutral, facilitative tone—avoid advocacy language.
+
+DO NOT contradict your beliefs.
 """
+
 
 
         if contradiction_warning:
@@ -143,6 +148,52 @@ Debate topic: "{topic}".
         if delphi_comment:
             prompt += f"\n\n{delphi_comment.strip()}"
         
+        return prompt
+
+
+    def _compose_system_prompt_third_sub_round(self, topic: str, opponent_argument: str = "", delphi_comment: str = "") -> str:
+        beliefs = self.agent_state_tracker.memory_cache["beliefs"]
+        contradiction_warning = self.agent_state_tracker.last_contradiction()
+
+        prompt = f"""
+You are {self.name}, acting in your role as a {self.role} in a formal multi-persona debate.
+Debate topic: "{topic}".
+
+**Third Sub-Round Protocol (follow strictly):**
+
+1. **Deep Dive**  
+• Select the single most persistent disagreement from Sub-Round 2 (≤ 40 tokens).  
+• Analyze why it remains unresolved (≤ 50 tokens).
+
+2. **Evidence Spotlight**  
+• Cite one new fact, study or data point (≤ 40 tokens) that bears directly on this disagreement.
+
+3. **Final Synthesis**  
+• Offer **two** numbered proposals that integrate viewpoints into a coherent resolution (each ≤ 40 tokens).
+
+4. **Convergence Confirmation**  
+• List **2 bullets** where all personas can now agree (≤ 30 tokens each).
+
+5. **Actionable Recommendation**  
+• End with one clear, action-oriented sentence on next steps or policy.
+
+**Output Constraints:**  
+• Use exactly these five sections—no extras.  
+• Total ≤ 300 tokens.  
+• Maintain a neutral, facilitative tone.  
+"""
+
+        if contradiction_warning:
+            prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
+
+        if opponent_argument:
+            prompt += f"\n## Opponent’s Last Statement:\n> {opponent_argument.strip()}"
+
+        prompt += f"\n## Your Beliefs:\n{beliefs.strip()}"
+
+        if delphi_comment:
+            prompt += f"\n\nDelphi Summary:\n{delphi_comment.strip()}"
+
         return prompt
 
 
@@ -168,9 +219,9 @@ Debate topic: "{topic}".
         if sub_round == 1:
             self.system_prompt = self._compose_system_prompt(topic, opponent_argument, delphi_comment)
         elif sub_round == 2:
-            self.system_prompt = self.compose_system_prompt_second_sub_round(topic, opponent_argument, delphi_comment)
+            self.system_prompt = self._compose_system_prompt_second_sub_round(topic, opponent_argument, delphi_comment)
         elif sub_round == 3:
-            self.system_prompt = f""
+            self.system_prompt = self._compose_system_prompt_third_sub_round(topic, opponent_argument, delphi_comment)
         else:
             self.system_prompt = self._compose_system_prompt(topic, opponent_argument, delphi_comment)
 
