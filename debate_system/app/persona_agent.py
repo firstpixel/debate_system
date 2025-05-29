@@ -2,6 +2,7 @@ import logging
 import time
 from typing import Callable, List, Dict, Optional
 import numpy as np
+import re
 
 from app.core_llm import LLMClient
 from app.agent_state_tracker import AgentStateTracker
@@ -294,26 +295,54 @@ Debate topic: "{topic}".
         
         return response
 
-    def _extract_important_info(self, text: str) -> List[str]:
-        """Extract important information from a response for long-term memory."""
-        important_parts = []
-        
-        # Split text into sentences
-        sentences = [s.strip() for s in text.split('.') if s.strip()]
-        
-        for sentence in sentences:
-            # Check for citations
-            if '(source:' in sentence.lower() or '(stat:' in sentence.lower():
-                important_parts.append(sentence + '.')
-            
-            # Check for policy suggestions or experimental designs
-            if any(keyword in sentence.lower() for keyword in ['policy', 'experiment', 'suggest']):
-                important_parts.append(sentence + '.')
-                
-            # Check for definitions (usually at the beginning of debates)
-            if any(keyword in sentence.lower() for keyword in ['define', 'definition', 'means']):
-                important_parts.append(sentence + '.')
-        
-        return important_parts
 
+
+    # -------------------------------------------------------------------
+    # Inside your existing class
+    # -------------------------------------------------------------------
+    def _extract_important_info(self, text: str) -> List[str]:
+
+        # -------------------- regex & keyword tables --------------------
+        citation_re   = re.compile(r"\((?:source|stat|study|paper|ref):[^)]*\)", re.I)
+        numbers_re    = re.compile(
+            r"(?:\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*(?:%|percent|bn|billion|m|million|usd|€|£)|\b20\d{2}\b)",
+            re.I,
+        )
+
+        KW_POLICY      = {
+            "policy", "policies", "regulation", "regulatory",
+            "experiment", "experimental", "pilot", "trial",
+            "recommend", "recommendation", "suggest", "proposal", "propose",
+        }
+        KW_DEFINITION  = {"define", "definition", "means", "refers to", "is defined as"}
+        KW_HYPOTHESIS  = {
+            "hypothesis", "assumption", "framework", "model",
+            "theory", "architecture", "roadmap",
+        }
+
+        # -------------------- sentence splitting -----------------------
+        # Retém pontuação final para facilitar a recomposição.
+        sentences = [
+            s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()
+        ]
+
+        important_parts: List[str] = []
+        seen: set[str] = set()
+
+        # -------------------- main loop --------------------------------
+        for sent in sentences:
+            lower = sent.lower()
+            matched = (
+                citation_re.search(sent)                                       # 1. citações
+                or any(k in lower for k in KW_POLICY)                          # 2. políticas
+                or any(k in lower for k in KW_DEFINITION)                      # 3. definições
+                or numbers_re.search(sent)                                     # 4. números / métricas
+                or any(k in lower for k in KW_HYPOTHESIS)                      # 5. hipóteses
+            )
+
+            if matched and sent not in seen:
+                important_parts.append(sent if sent.endswith(".") else sent + ".")
+                seen.add(sent)
+
+        return important_parts
 

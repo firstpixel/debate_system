@@ -1,6 +1,5 @@
 # app/debate_manager.py
 
-
 import re
 from typing import Any, Callable, Dict, List, Optional
 import uuid
