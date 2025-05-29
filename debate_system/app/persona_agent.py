@@ -25,7 +25,7 @@ class PersonaAgent:
         self.perf_logger = None
         self.contradiction_checker = ContradictionDetector()
 
-    def _compose_system_prompt(self, topic: str, opponent_argument: str = "") -> str:
+    def _compose_system_prompt(self, topic: str, opponent_argument: str = "", delphi_comment: str = "") -> str:
         beliefs = self.agent_state_tracker.memory_cache["beliefs"]
         contradiction_warning = self.agent_state_tracker.last_contradiction()
 
@@ -51,6 +51,8 @@ Debate topic: "{topic}".
 • Begin every turn with the Steel-man summary (step ➁ above) **before** any rebuttal.  
 • Concede any part you find reasonable in ≤ 40 tokens.
 • If you disagree, explain why in ≤ 40 tokens, and propose a intermediate adjustment to the opponent's argument.
+• Always try to adjust the opponent's argument to make it more reasonable, even if you disagree with it.
+• If you cannot concede, ask a direct question to the opponent to clarify their point.
 
 3. **Evidence**
 • For every factual claim include a parenthetical citation hint, try to find evidence from the last 5 years.:  
@@ -66,6 +68,7 @@ Debate topic: "{topic}".
 
 5. **Progress Checkpoint**
 • After two exchanges on the same sub-topic, pivot: introduce *new* evidence or propose a synthesis.
+• Propose changes to the opponent's argument if you disagree, always trying to find a middle ground.
 
 6. **Failure Modes—avoid:**  
 • >10 % duplicate tokens with any previous turn (n-gram > 4).  
@@ -82,6 +85,7 @@ Debate topic: "{topic}".
 """
 
 
+
         if contradiction_warning:
             prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
 
@@ -90,7 +94,57 @@ Debate topic: "{topic}".
 
         prompt += f"\n## Your Current Beliefs:\n{beliefs.strip()}"
         
+        if delphi_comment:
+            prompt += f"\n\n## Previous Delphi Consensus:\n{delphi_comment.strip()}"
+        
         return prompt
+
+    def compose_system_prompt_second_sub_round(self, topic: str, opponent_argument: str = "", delphi_comment: str = "") -> str:
+        beliefs = self.agent_state_tracker.memory_cache["beliefs"]
+        contradiction_warning = self.agent_state_tracker.last_contradiction()
+        
+        prompt = f"""
+You are {self.name}, acting in your role as a {self.role} in a formal multi-persona debate.
+Debate topic: "{topic}".
+
+**Second Sub-Round Protocol (follow strictly):**
+
+1. **Cross-Persona Perspective**  
+   • Summarize (in 2–3 bullets, ≤ 30 tokens each) the **key arguments** contributed so far by *all* personas (TechAdvocate, Ethicist, etc.), drawing on the Delphi synthesis.
+
+2. **Antithesis**  
+   • Identify one core point of disagreement between any two personas (≤ 40 tokens).  
+   • Explain briefly why this disagreement persists (≤ 40 tokens).
+
+3. **Synthesis**  
+   • Propose a **bridging argument** that combines elements from at least two personas’ views (1 numbered point, ≤ 40 tokens).  
+   • Show how this reconciliation addresses the antithesis above (≤ 40 tokens).
+
+4. **Points of Convergence**  
+   • List up to **3 bullet items** where personas already agree (≤ 30 tokens each).
+
+5. **Narrowing Question**  
+   • End with *one direct question* aimed at resolving any remaining core tension.
+
+6. **Output Format**  
+   • Use exactly the five numbered sections above—no extras.  
+   • Keep total response ≤ 500 tokens.
+"""
+
+
+        if contradiction_warning:
+            prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
+
+        if opponent_argument:
+            prompt += f"\n## Your Opponent's Last Statement:\n> {opponent_argument.strip()}"
+
+        prompt += f"\n## Your Current Beliefs:\n{beliefs.strip()}"
+        
+        if delphi_comment:
+            prompt += f"\n\n{delphi_comment.strip()}"
+        
+        return prompt
+
 
     def interact(
         self,
@@ -98,13 +152,27 @@ Debate topic: "{topic}".
         opponent_argument: str = "",
         topic: str = "",
         stream_callback: Optional[Callable[[str], None]] = None,
-        debate_history: Optional[list] = None  # New argument
+        debate_history: Optional[list] = None,
+        sub_round: int = 1
     ) -> str:
 
         logger.info(f"########### Agent {self.name} interacting with prompt: {user_prompt}")
         
-
-        self.system_prompt = self._compose_system_prompt(topic, opponent_argument)
+        #extract consensus from previous round if available
+        delphi_comment = None
+        if debate_history is not None and len(debate_history) > 0:
+            last_round = debate_history[-1] if debate_history else {}
+            if last_round.get("agent") == "Delphi":
+                delphi_comment = f"\n\nPrevious Consensus:\n{last_round.get('content', '')}"
+        
+        if sub_round == 1:
+            self.system_prompt = self._compose_system_prompt(topic, opponent_argument, delphi_comment)
+        elif sub_round == 2:
+            self.system_prompt = self.compose_system_prompt_second_sub_round(topic, opponent_argument, delphi_comment)
+        elif sub_round == 3:
+            self.system_prompt = f""
+        else:
+            self.system_prompt = self._compose_system_prompt(topic, opponent_argument, delphi_comment)
 
         if not self.context_builder:
             self.context_builder = ContextBuilder(
@@ -119,7 +187,7 @@ Debate topic: "{topic}".
             mode="default"
         )
 
-       
+
 
         messages = [{"role": "system", "content": self.system_prompt}]
         messages.extend(context_messages) 

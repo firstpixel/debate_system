@@ -1,9 +1,9 @@
 # app/debate_manager.py
 
 
-from typing import Callable, Optional
+import re
+from typing import Any, Callable, Dict, List, Optional
 import uuid
-from app.performance_logger import PerformanceLogger
 from app.persona_agent import PersonaAgent
 from app.logger import save_log_files
 from app.user_feedback import get_feedback_form, save_feedback
@@ -23,7 +23,6 @@ class DebateManager:
     def __init__(self, config: dict):
         self.config = config
         self.session_id = config.get("session_id") or str(uuid.uuid4())
-        self.performance_logger = PerformanceLogger(self.session_id)
         self.debate_history = []
         self.argument_graph = ArgumentGraph()
         self.final_summary = None
@@ -77,14 +76,34 @@ class DebateManager:
             strategy=self.config.get("turn_strategy", "round_robin")
         )
 
-    def start(self, feedback_callback: Optional[Callable[[str], None]] = None):
+    def build_prompt(self, agent, round_num, sub_round=1, opponent_last="", delphi_comment="", theme=None):
+        topic = self.config.get("topic", "")
+        if round_num == 0:
+            prompt = f"{topic} Round {round_num + 1}, your turn:"
+        else:
+            if theme is None and 1 <= (round_num - 3) <= 30:
+                idx = round_num - 3
+                try:
+                    theme = f"Please consider this perspective or lens: {DiscussionLens.get_theme(idx)} \n"
+                except Exception:
+                    theme = None
+            prompt = f"Topic: {topic}"
+            if theme is not None:
+                prompt += f" Debate Perspective: {theme}"
+            prompt += f"  Round {round_num + 1}, your turn: {agent.name}"
+            if delphi_comment:
+                prompt += f"\n\nSummary: {delphi_comment.strip()}"
+        return prompt
 
+    def start(self, feedback_callback: Optional[Callable[[str], None]] = None):
         print("DebateManager started with config:")
         print(self.config)
         print("Session ID:", self.session_id)
-        self.performance_logger.save()
 
         rounds = self.config.get("rounds", 3)
+        print(f"Total rounds configured: {rounds}")
+
+
 
         for round_num in range(rounds):
             print(f"\n🔁 Round {round_num + 1} / {rounds}")
@@ -93,13 +112,14 @@ class DebateManager:
             if feedback_callback:
                 feedback_callback("Round_Marker", f"## 🔁 Round {round_num + 1} / {rounds}")
 
+            topic = self.config.get("topic", "")
             for _ in range(len(self.agents)):
                 # FlowController determines next agent
                 selected_name = self.flow_controller.next_turn({
                     "round": round_num,
                     "history": self.debate_history
                 })
-                print(f"DEBUG Manager: Round={round_num+1}, Selected Agent by FlowController='{selected_name}'")
+                print(f"DEBUG Manager: Round={round_num+1}, sub_round=1, Selected Agent by FlowController='{selected_name}'")
 
                 # Always get the agent object before attempting to find an opponent
                 agent = next(a for a in self.agents if a.name == selected_name)
@@ -134,32 +154,10 @@ class DebateManager:
                 )
 
 
-                topic = self.config.get("topic", "")
-                if(round_num == 0):
-                    prompt = f"{topic} Round {round_num + 1}, your turn:"
-                else:
-                     # Sugestion themes
-                     
-                    rnd=round_num 
-                    try:
-                        idx = rnd - 3
-                        if idx < 1 or idx > 30:
-                            theme = None
-                            print(f"Round {idx:2d} theme is not defined. Using free theme.")
-                        else:
-                            print(f"Round {idx:2d}: {DiscussionLens.get_theme(idx)}")
-                            theme = f"Please consider this perspective or lens: {DiscussionLens.get_theme(idx)} \n"
-                    except ValueError as e:
-                        theme = None
-                        print(f"Round {idx:2d}: {e}")
-                    
-                    
-                    delphi_comment = next((r["content"] for r in reversed(self.debate_history) if r["agent"] == "Delphi"), "")
-                    prompt = f"Topic: {topic}"
-                    if theme != None:
-                        prompt += f" Debate Perspective: {theme}"
-                    prompt +=f"  Round {round_num + 1}, your turn: {agent.name}\n\nSummary: {delphi_comment.strip()}"
-
+                # Build theme and delphi_comment for prompt
+                theme = None
+                delphi_comment = next((r["content"] for r in reversed(self.debate_history) if r["agent"] == "Delphi"), "")
+                prompt = self.build_prompt(agent, round_num, sub_round=1, opponent_last=opponent_last, delphi_comment=delphi_comment, theme=theme)
 
                 response = ""
 
@@ -176,19 +174,18 @@ class DebateManager:
                 print(f"Agent {agent.name} is interacting with prompt: {prompt}")
                 print(f"Opponent's last statement: {opponent_last}")
                 print(f"Debate history: {self.debate_history}")
+                
+                
                 response=""
                 response = agent.interact(
                     user_prompt=prompt,
                     opponent_argument=opponent_last,
                     topic=topic,
                     stream_callback=stream_to_ui,
-                    debate_history=self.debate_history  # Pass full debate history
+                    debate_history=self.debate_history,
+                    sub_round=1
                 )
 
-                # Realtime feedback to Streamlit
-                #if feedback_callback:
-                #    feedback_callback(f"#### {agent.name} says:\n{response}")
-                    
                 
 
                 # Track this agent's turn for conflict detection later
@@ -196,6 +193,7 @@ class DebateManager:
 
                 self.debate_history.append({
                     "round": round_num + 1,
+                    "sub_round": 1,
                     "agent": agent.name,
                     "role": agent.role,
                     "content": response
@@ -246,6 +244,7 @@ class DebateManager:
                         # Add mediator's response to the debate history
                         self.debate_history.append({
                             "round": round_num + 1,
+                            "sub_round": 1,
                             "agent": "Mediator",
                             "role": "Debate Mediator",
                             "content": mediator_response
@@ -270,23 +269,63 @@ class DebateManager:
                 # Save for next round injection
                 self.debate_history.append({
                     "round": round_num + 1,
+                    "sub_round": 1,
                     "agent": "Delphi",
                     "role": "Consensus Facilitator",
                     "content": delphi_output
                 })
 
                 # # Optional: Show Delphi result on UI
-                if feedback_callback:
-                    feedback_callback("Delphi", "#### 🧠 Delphi Synthesis Result:\n" + delphi_output, round_num + 1)
+                #if feedback_callback:
+                #    feedback_callback("Delphi", "#### 🧠 Delphi Synthesis Result:\n" + delphi_output, round_num + 1)
+                    
+                
             else:
                 print("\n🔮 Delphi Synthesis Phase (Disabled)")
                 # Skip Delphi synthesis when disabled
         
-            
-            
-            
-        self.performance_logger.save()
-        print("\n🧠 Performance log saved.")
+
+            # --- SUB-ROUND 2: cross-persona reconciliation pass ---
+            # reset speaker-tracker for this sub-round
+            self._round_speakers = set()
+            for agent in self.agents:
+                prompt = self.build_prompt(agent, round_num, sub_round=2, opponent_last=opponent_last, delphi_comment=delphi_comment, theme=theme)
+                response = agent.interact(
+                    user_prompt=prompt,
+                    opponent_argument=opponent_last,
+                    topic=topic,
+                    stream_callback=stream_to_ui,
+                    debate_history=self.debate_history,
+                    sub_round=2
+                )
+                self.debate_history.append({
+                    "round":     round_num + 1,
+                    "sub_round": 2,
+                    "agent":     agent.name,
+                    "role":      agent.role,
+                    "content":   response
+                })
+            # --- OPTIONAL SUB-ROUND 3 if needed ---
+            if self.needs_third_subround(self.debate_history, self.delphi_engine):
+                self._round_speakers = set()
+                for agent in self.agents:
+                    prompt = self.build_prompt(agent, round_num, sub_round=3, opponent_last=opponent_last, delphi_comment=delphi_comment, theme=theme)
+                    response = agent.interact(
+                        user_prompt=prompt,
+                        opponent_argument=opponent_last,
+                        topic=topic,
+                        stream_callback=stream_to_ui,
+                        debate_history=self.debate_history,
+                        sub_round=3
+                    )
+                    self.debate_history.append({
+                        "round":     round_num + 1,
+                        "sub_round": 3,
+                        "agent":     agent.name,
+                        "role":      agent.role,
+                        "content":   response
+                    }) 
+
 
         # Mock feedback for demonstration purposes
         # demo_feedback = get_feedback_form()
@@ -299,13 +338,13 @@ class DebateManager:
 
         self.finalize_debate(feedback_callback)
 
+
         save_log_files(
             session_id=self.session_id,
             config=self.config,
             transcript=self.debate_history,
             consensus_block=self.final_summary,
-            graph=self.argument_graph,
-            performance=self.performance_logger
+            graph=self.argument_graph
         )
 
     def finalize_debate(self, feedback_callback=None):
@@ -344,3 +383,70 @@ class DebateManager:
             feedback_callback("Audit Report", f"## 📋 Final Tester Audit Report:\n{audit_summary}")
 
 
+
+
+
+    def needs_third_subround(
+        debate_history: List[Dict[str, Any]],
+        delphi_engine: DelphiEngine,
+        current_round: int = None,
+        min_convergence: int = 2,
+        max_tensions: int = 1
+    ) -> bool:
+        """
+        Hybrid check: first a bullet-count heuristic, then (if needed)
+        an LLM-based sanity check via DelphiEngine.
+
+        Returns True if we still need a 3rd sub-round.
+        """
+        # 1. Determine which round to inspect
+        rounds = [e.get("round", 0) for e in debate_history]
+        if not rounds:
+            return False
+        current = current_round or max(rounds)
+
+        # 2. Gather Sub-Round 2 entries (excluding Delphi)
+        entries = [
+            e for e in debate_history
+            if e.get("round") == current
+            and e.get("sub_round") == 2
+            and e.get("agent") != "Delphi"
+        ]
+        if not entries:
+            return False
+
+        # 3. Helper to pull bullet lists under a section header
+        def _parse_section(content: str, header: str) -> List[str]:
+            pattern = rf"{re.escape(header)}(.*?)(?=\n\d+\.)"
+            m = re.search(pattern, content, re.S)
+            if not m:
+                return []
+            return re.findall(r"[-•]\s*(.+)", m.group(1))
+
+        # 4. Deterministic pass
+        need_round = False
+        for entry in entries:
+            text = entry["content"]
+            conv = _parse_section(text, "4. Points of Convergence")
+            tens = _parse_section(text, "2. Antithesis")
+            if len(conv) < min_convergence or len(tens) > max_tensions:
+                need_round = True
+                break
+
+        # 5. If heuristic says “no”, skip LLM altogether
+        if not need_round:
+            return False
+
+        # 6. Fallback to Delphi LLM sanity check
+        agent_texts = [e["content"] for e in entries]
+        result = delphi_engine.run_consensus_round(agent_texts, agents_num=len(entries))
+        consensus_md = result.get("consensus", "")
+        # count bullets in the “#### Consensus” section
+        bullets = re.findall(r"^-", consensus_md, re.M)
+
+        # 7. If Delphi sees enough consensus bullets, we can skip sub-round 3
+        if len(bullets) >= min_convergence:
+            return False
+
+        # otherwise we really need sub-round 3
+        return True

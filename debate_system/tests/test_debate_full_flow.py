@@ -35,16 +35,14 @@ def test_full_feature_debate(tmp_path):
     session_path.mkdir()
 
     from app.logger import save_log_files
-    from app.performance_logger import PerformanceLogger
 
-    perf = PerformanceLogger("test_session")
     save_log_files(
         session_id="test_session",
         config=config,
         transcript=dm.debate_history,
         consensus_block=dm.final_summary,
         graph=graph,
-        performance=perf
+        performance=None
     )
 
     # Validate output files exist

@@ -17,7 +17,7 @@ DEFAULT_CONFIG = {
     "bayesian_tracking": True,
     "delphi": {
         "enabled": False,
-        "rounds": 2,
+        "rounds": 1,
         "summary_style": "bullet_points"
     },
     "mcts": {
@@ -35,10 +35,7 @@ def get_project_root():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def _load_yaml(file_path: str) -> dict:
-    # If file_path is not absolute, treat it as relative to project root
-    if not os.path.isabs(file_path):
-        file_path = os.path.join(get_project_root(), file_path)
-    
+    # Always use the provided path as-is (assume absolute or correct relative)
     with open(file_path, "r") as f:
         return yaml.safe_load(f)
     
@@ -85,4 +82,5 @@ def load_config(file_path: str) -> dict:
     else:
         raise ValueError(f"Unsupported config format: {ext}")
 
-    return normalize_config(user_cfg)
+    cfg = normalize_config(user_cfg)
+    return cfg

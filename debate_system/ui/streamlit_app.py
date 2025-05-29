@@ -31,12 +31,21 @@ if uploaded_config:
     st.sidebar.text_area("YAML Preview", value=cfg_text, height=300)
 
 if st.session_state.cfg_text:
+
     os.makedirs("tmp", exist_ok=True)
     temp_path = os.path.join("tmp", "temp_uploaded.yaml")
+
+
     with open(temp_path, "w") as f:
         f.write(st.session_state.cfg_text)
 
     config = load_config(temp_path)
+
+    # --- Show agents list before debate starts ---
+    agents_list = ["## 🧑‍🤝‍🧑 Agents:"]
+    for p in config.get("personas", []):
+        agents_list.append(f"- **{p['name']}** ({p['role']})")
+    st.markdown("\n".join(agents_list))
 
     # ─── Start Debate ──────────────────────────────────
     if st.sidebar.button("🚀 Start Debate"):
@@ -151,3 +160,4 @@ if st.session_state.debate_complete:
 
 else:
     st.info("Please upload a YAML config file to begin.")
+

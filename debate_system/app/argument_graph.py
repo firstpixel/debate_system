@@ -39,9 +39,6 @@ class ArgumentGraph:
 
         return "\n".join(lines)
 
-    # def export_json(self) -> Dict:
-    #     return nx.readwrite.json_graph.node_link_data(self.graph, edges="links")
-    
     def export_json(self) -> Dict:
         return nx.readwrite.json_graph.node_link_data(self.graph)
     

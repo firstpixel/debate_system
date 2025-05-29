@@ -4,7 +4,6 @@ import os
 import json
 from typing import List, Dict
 from app.argument_graph import ArgumentGraph
-from app.performance_logger import PerformanceLogger
 import logging
 
 SESSION_DIR = "sessions"
@@ -15,7 +14,7 @@ def save_log_files(
     transcript: List[Dict],
     consensus_block: str,
     graph: ArgumentGraph,
-    performance: PerformanceLogger
+    performance
 ):
     path = f"{SESSION_DIR}/{session_id}/"
     os.makedirs(path, exist_ok=True)
