@@ -13,8 +13,7 @@ def save_log_files(
     config: Dict,
     transcript: List[Dict],
     consensus_block: str,
-    graph: ArgumentGraph,
-    performance
+    graph: ArgumentGraph
 ):
     path = f"{SESSION_DIR}/{session_id}/"
     os.makedirs(path, exist_ok=True)
@@ -36,12 +35,6 @@ def save_log_files(
     md_lines.append("\n## 🧠 Final Consensus:\n")
     md_lines.append(consensus_block)
 
-    # Optional: append performance summary
-    md_lines.append("\n## ⏱️ Performance Summary:\n")
-    stats = performance.get_stats()
-    for agent, t in stats["per_agent_avg_time"].items():
-        md_lines.append(f"- **{agent}**: avg {t}s")
-
     # Filter out None values before joining
     md_lines = [line for line in md_lines if line is not None]
 
@@ -54,10 +47,6 @@ def save_log_files(
         "transcript": transcript,
         "consensus": consensus_block,
         "argument_graph": graph.export_json(),
-        "performance": {
-            "log": performance.logs,
-            "summary": stats
-        }
     }
 
     with open(path + "summary.json", "w") as f:
