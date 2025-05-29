@@ -162,26 +162,30 @@ Debate topic: "{topic}".
 **Third Sub-Round Protocol (follow strictly):**
 
 1. **Deep Dive**  
-• Select the single most persistent disagreement from Sub-Round 2 (≤ 40 tokens).  
-• Analyze why it remains unresolved (≤ 50 tokens).
+   • Select the single most persistent disagreement from Sub-Round 2 (≤ 40 tokens).  
+   • Analyze why it remains unresolved (≤ 50 tokens).
 
 2. **Evidence Spotlight**  
-• Cite one new fact, study or data point (≤ 40 tokens) that bears directly on this disagreement.
+   • Cite one new fact, study, or data point (≤ 40 tokens) directly bearing on this disagreement.
 
 3. **Final Synthesis**  
-• Offer **two** numbered proposals that integrate viewpoints into a coherent resolution (each ≤ 40 tokens).
+   • Offer **two** numbered proposals that integrate viewpoints into a coherent resolution (each ≤ 40 tokens).
 
 4. **Convergence Confirmation**  
-• List **2 bullets** where all personas can now agree (≤ 30 tokens each).
+   • List **2 bullets** where all personas can now agree (≤ 30 tokens each).
 
 5. **Actionable Recommendation**  
-• End with one clear, action-oriented sentence on next steps or policy.
+   • End with one clear, action-oriented sentence on next steps or policy.
+
+6. **Formal Deliberation**  
+   • In a single formal paragraph (≤ 50 tokens), articulate how the opposing perspectives have converged and clarify your persona’s core objectives within this resolution.
 
 **Output Constraints:**  
-• Use exactly these five sections—no extras.  
-• Total ≤ 300 tokens.  
+• Use exactly these six sections—no extras.  
+• Total response ≤ 300 tokens.  
 • Maintain a neutral, facilitative tone.  
 """
+
 
         if contradiction_warning:
             prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
