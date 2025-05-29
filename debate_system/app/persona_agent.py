@@ -201,6 +201,54 @@ Debate topic: "{topic}".
 
         return prompt
 
+    def _compose_reflection_prompt(self, topic: str) -> str:
+        beliefs = self.agent_state_tracker.memory_cache["beliefs"]
+        contradiction_warning = self.agent_state_tracker.last_contradiction()
+
+        prompt = f"""
+You are {self.name}, acting in your role as a {self.role} in a formal debate.
+Debate topic: "{topic}".
+
+# REFLECTION ROUND - DO NOT INTRODUCE NEW ARGUMENTS
+# CHECK ALL HISTORY OF THE DEBATE AND YOUR BELIEFS
+
+Sections (≤ 2000 tokens total):
+1. **Consistency Check** - Point out any contradiction in your own previous statements (≤ 40 tokens)
+2. **Strongest Point from the Other Side** - One sentence
+3. **Revised Position** - Update your position if needed (≤ 40 tokens)
+4. **Consensus Offer** - Suggest wording BOTH sides could accept (≤ 40 tokens)
+
+Constraints:
+- No new evidence; use only material already cited.
+- Use headers **1-4** exactly.
+"""
+        if contradiction_warning:
+            prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
+        prompt += f"\n## Your Current Beliefs:\n{beliefs.strip()}"
+        return prompt
+
+    def _compose_summary_prompt(self, topic: str) -> str:
+        beliefs = self.agent_state_tracker.memory_cache["beliefs"]
+
+        prompt = f"""
+You are {self.name}, acting as a {self.role} in a structured debate.
+
+# FINAL REPORT
+# BASED ON THE DEBATE HISTORY and YOU LAST REFLACTION ROUND
+
+Sections (≤ 3000 tokens total):
+1. **Core Stance** - State your final position clearly.
+2. **Key Evidence** - Max 3 bullets, strongest data-backed points.
+3. **Agreed Elements** - Max 3 bullets both sides accepted.
+4. **Unresolved Issues** - Max 2 bullets of disagreement.
+5. **Action Roadmap** - 1-2 sentences: what should happen next?
+
+Use headings 1-5 exactly.
+Stay neutral in tone and concise.
+"""
+        prompt += f"\n\n## Your Beliefs:\n{beliefs.strip()}"
+        return prompt
+
 
     def interact(
         self,
@@ -209,7 +257,8 @@ Debate topic: "{topic}".
         topic: str = "",
         stream_callback: Optional[Callable[[str], None]] = None,
         debate_history: Optional[list] = None,
-        sub_round: int = 1
+        sub_round: int = 1,
+        phase: str = "NORMAL"
     ) -> str:
 
         logger.info(f"########### Agent {self.name} interacting with prompt: {user_prompt}")
@@ -221,7 +270,11 @@ Debate topic: "{topic}".
             if last_round.get("agent") == "Delphi":
                 delphi_comment = f"\n\nPrevious Consensus:\n{last_round.get('content', '')}"
         
-        if sub_round == 1:
+        if phase == "REFLECTION":
+            self.system_prompt = self._compose_reflection_prompt(topic)
+        elif phase == "SUMMARY":
+            self.system_prompt = self._compose_summary_prompt(topic)
+        elif sub_round == 1:
             self.system_prompt = self._compose_system_prompt(topic, opponent_argument, delphi_comment)
         elif sub_round == 2:
             self.system_prompt = self._compose_system_prompt_second_sub_round(topic, opponent_argument, delphi_comment)
@@ -250,7 +303,6 @@ Debate topic: "{topic}".
 
         messages.append({"role": "user", "content": user_prompt + "\nOpponent arguments: " + opponent_argument})
 
-        logger.debug(f"#############################----------------------------Messages sent to LLM: {messages}")
         print(f"#############################----------------------------Messages sent to LLM: {messages}")
 
         response = ""
@@ -272,7 +324,8 @@ Debate topic: "{topic}".
         self.agent_state_tracker.save_belief(response)
 
         # Save the complete message to STM
-        self.agent_state_tracker.memory.add_turn(self.name, response)
+
+        self.agent_state_tracker.memory.add_turn(self.name, response, phase=phase.lower())
 
         # Optionally identify and save important parts to LTM
         important_parts = self._extract_important_info(response)

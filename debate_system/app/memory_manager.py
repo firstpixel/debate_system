@@ -55,7 +55,7 @@ class MemoryManager:
         recent_str = "\n".join(f"{t['role']}: {t['content']}" for t in recent)
         return "\n\n".join(filter(None, [summary, recent_str]))
 
-    def add_turn(self, agent_id: str, message: str) -> str:
+    def add_turn(self, agent_id: str, message: str, phase: str = "normal") -> str:
         """Adds message to STM and LTM, returns inserted ID. Now also generates and stores a summary."""
         # Generate summary using LLM
         summary_prompt = [
@@ -65,7 +65,10 @@ class MemoryManager:
         summary = self.llm.chat(summary_prompt)
         # Store message and summary in STM
         turn_id = self.stm.store_turn(agent_id, message, summary=summary)
-        self.ltm.store_memory(agent_id, message, tags=["turn"])
+        tags = ["turn"]
+        if phase != "normal":
+            tags.append(phase)
+        self.ltm.store_memory(agent_id, message, tags=tags)
         return turn_id
 
     # ---------------------------------------------
