@@ -1,0 +1,48 @@
+topic: "Can artificial intelligence possess consciousness?"
+rounds: 20
+use_mediator: true
+consensus_strategy: mediator_summary
+turn_strategy: round_robin
+
+delphi:
+  enabled: true
+  rounds: 1
+  summary_style: bullet_points
+
+personas:
+  - name: "Computationalist"
+    model: "gemma3:latest"
+    role: 
+      Computational neuroscientist who argues that consciousness
+      is substrate-independent information processing; advanced AI
+      could therefore achieve genuine phenomenal awareness.
+    temperature: 0.7
+
+  - name: "Phenomenologist"
+    model: "gemma3:latest"
+    role: 
+      Philosopher of mind focused on qualia and embodiment; maintains
+      that subjective experience arises only from biological processes,
+      so AI can never be truly conscious.
+    temperature: 0.5
+
+  - name: "CognitiveEngineer"
+    model: "gemma3:latest"
+    role: 
+      Pragmatic AI researcher/engineer who examines empirical markers
+      (global workspace, metacognition, integrated information) and
+      weighs functional evidence without strong a-priori bias.
+    temperature: 0.6
+
+  - name: "CosmicPhilosopher"
+    model: "gemma3:latest"
+    role: 
+      Panpsychist thinker who sees consciousness as a universal field
+      or frequency permeating the cosmos; asserts that sufficiently
+      complex autonomous systems—biological or artificial—can tune in
+      and participate in this field.
+    temperature: 0.9
+
+mediator:
+  type: summarizer
+  model: "gemma3:latest"

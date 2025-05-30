@@ -518,10 +518,12 @@ class DebateManager:
                 need_round = True
                 break
 
+        print(f"DEBUG: Sub-round 2 convergence bullets: {len(conv)}, antithesis bullets: {len(tens)}")
         # 5. If heuristic says “no”, skip LLM altogether
         if not need_round:
             return False
 
+        
         # 6. Fallback to Delphi LLM sanity check
         agent_texts = [e["content"] for e in entries]
         result = delphi_engine.run_consensus_round(agent_texts, agents_num=len(entries))
