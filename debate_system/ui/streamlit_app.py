@@ -3,14 +3,67 @@ import os
 import streamlit as st
 import yaml
 
+
 # Internal imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app.config import load_config
 from app.debate_manager import DebateManager
 from ui.pages.ContradictionHeatmap import render_contradiction_heatmap
+from app.markdown_converter_agent import MarkdownConverterAgent
 
 st.set_page_config(layout="wide")
 st.title("🧠 Autonomous Debate Engine")
+
+# --- Document Upload & RAG Sidebar ---
+st.sidebar.header("📄 Document RAG Upload")
+doc_agent = MarkdownConverterAgent()
+
+# Upload file
+uploaded_file = st.sidebar.file_uploader("Upload Document (PDF, TXT, MD)", type=["pdf", "txt", "md", "markdown"])
+
+# Upload by URL (web, GitHub, YouTube)
+url_input = st.sidebar.text_input("Or enter a URL (web, GitHub, YouTube)")
+
+# Optional: Document title
+doc_title = st.sidebar.text_input("Document Title (optional)")
+
+# Upload button
+if st.sidebar.button("Upload to RAG"):
+    meta = {"title": doc_title} if doc_title else {}
+    if uploaded_file:
+        result = doc_agent.ingest(user_input=None, metadata=meta, file=uploaded_file)
+        if result.get('status') == 'success':
+            st.sidebar.success(f"Uploaded: {result.get('title')}")
+        else:
+            st.sidebar.error(f"Error: {result.get('reason')} (File: {result.get('title')})")
+    elif url_input:
+        result = doc_agent.ingest(user_input=url_input, metadata=meta)
+        if result.get('status') == 'success':
+            st.sidebar.success(f"Uploaded: {result.get('title')}")
+        else:
+            st.sidebar.error(f"Error: {result.get('reason')}")
+    else:
+        st.sidebar.warning("Please upload a file or enter a URL.")
+
+# List all RAG documents in sidebar
+st.sidebar.markdown("---")
+st.sidebar.subheader("📚 RAG Documents")
+
+from app.memory_manager import MemoryManager
+mem_manager = MemoryManager()
+rag_docs = doc_agent.list_rag_documents()
+
+if rag_docs:
+    for doc in rag_docs:
+        doc_id = doc.get('doc_id')
+        col1, col2 = st.sidebar.columns([0.2, 0.8])
+        with col1:
+            if st.button("🗑️", key=f"delete_{doc_id}", help="Delete document"):
+                st.session_state['delete_confirm_doc'] = doc_id
+        with col2:
+            st.markdown(f"**{doc.get('title', doc_id)}**<br><span style='font-size:10px'>Chunks: {doc.get('total_chunks', '?')}</span>", unsafe_allow_html=True)
+else:
+    st.sidebar.info("No documents uploaded yet.")
 
 # ─── Session State Initialization ───────────────────────
 if "debate_complete" not in st.session_state:

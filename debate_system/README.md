@@ -132,6 +132,24 @@ Memory is dynamically summarized to fit within context windows, with intelligent
 
 ---
 
+## ⚠️ PDF Upload Support
+
+To enable PDF upload and conversion, you must install the `unstructured` package with PDF support:
+
+```sh
+pip install "unstructured[pdf]"
+```
+
+This will install `unstructured` and all required PDF dependencies. If you only install `unstructured` without the `[pdf]` extra, PDF upload will not work.
+
+You may also want to ensure you have `pdfminer.six` and `pypdf` installed:
+
+```sh
+pip install pdfminer.six pypdf
+```
+
+---
+
 ## 🧪 Testing
 
 ```bash
@@ -164,3 +182,13 @@ PRs and feature suggestions welcome. Future roadmap includes:
 ## 🧠 Maintained by
 
 Gil B. 
+
+
+## TODO
+-add document rag, so user can upload documents to be used during the debate to defend points of view (youtube transcriptions, github code, papers, pdf, text, docx, ..) transform into markdown, chunk and upload to the rag.
+-include a semantic search during the debate to search for facts on RAG to help defend points of view, using it as reference.
+
+-add config for display or not argument_graph
+-add language to config, so user can choose what language the debate will use
+-fix summary, to create a breafy summary of the debate on language selected.
+-make the full UI text, etc, to be saved on a markdown.

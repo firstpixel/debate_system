@@ -106,7 +106,46 @@ class MemoryManager:
         return [{"role": "user", "content": line} for line in results.splitlines() if line.strip()]
 
     def get_rag(self, agent_id: str, limit: int = 5) -> str:
-        return self.rag.query_rag(agent_id, limit)
+        # Deprecated: agent-specific RAG is no longer supported. Use get_ltm for agent LTM, or get_rag_documents for global RAG.
+        raise NotImplementedError("get_rag(agent_id, ...) is deprecated. Use get_ltm for agent LTM, or get_rag_documents for global RAG.")
+
+    def get_rag_documents(self, query: str, top_k: int = 5) -> List[str]:
+        """Query global RAG documents (debate_system_documents) by semantic similarity."""
+        return self.rag.query_text(query, top_k).splitlines()
+
+    def get_all_rag_documents(self, limit: int = 20) -> List[str]:
+        """Return all RAG documents (for UI display or admin)."""
+        return self.rag.query_rag(limit).splitlines()
 
     def query_rag(self, query: str, top_k: int = 5) -> str:
         return self.rag.query_text(query, top_k)
+
+    def delete_rag_document(self, doc_id: str) -> int:
+        """
+        Delete a RAG document (all chunks) by doc_id using the RAGRetriever.
+        Returns the number of deleted points.
+        """
+        return self.rag.delete_document(doc_id)
+
+    def add_rag_document(self, markdown_text: str, metadata: dict = None, chunk_size: int = None):
+        """
+        Add a markdown document to RAG (debate_memory_documents), chunked and with metadata.
+        """
+        self.rag.add_document(markdown_text, metadata=metadata, chunk_size=chunk_size)
+
+    def get_rag_documents_metadata(self, limit: int = 100):
+        """
+        Return all unique RAG documents with metadata (doc_id, title, source, total_chunks).
+        """
+        docs = {}
+        results, _ = self.rag.client.scroll(collection_name=self.rag.collection, limit=limit)
+        for r in results:
+            doc_id = r.payload.get('doc_id')
+            if doc_id and doc_id not in docs:
+                docs[doc_id] = {
+                    'doc_id': doc_id,
+                    'title': r.payload.get('title'),
+                    'source': r.payload.get('source'),
+                    'total_chunks': r.payload.get('total_chunks'),
+                }
+        return list(docs.values())

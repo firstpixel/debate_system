@@ -26,6 +26,7 @@ class AgentStateTracker:
             "beliefs": self.memory.get_beliefs(agent_name),
             "contradictions": self.memory.get_contradictions(agent_name),
             "ltm_context": self.get_ltm_context(),
+            # RAG context is now global, not agent-specific
             "rag_context": self.get_rag_context()
         }
 
@@ -51,8 +52,12 @@ class AgentStateTracker:
         messages = self.memory.get_ltm(self.agent_name, limit)
         return "\n".join([m["content"] for m in messages])
 
-    def get_rag_context(self, limit: int = 5) -> str:
-        return self.memory.get_rag(self.agent_name, limit)
+    def get_rag_context(self, query: str = None, limit: int = 5) -> str:
+        """Return RAG context from global documents, optionally using a semantic query."""
+        if query:
+            return "\n".join(self.memory.get_rag_documents(query, top_k=limit))
+        else:
+            return "\n".join(self.memory.get_all_rag_documents(limit=limit))
 
     def get_recent_messages(self, limit: int = 10) -> List[Dict]:
         raw_turns = self.memory.stm.get_recent_turns_raw(agent_id=self.agent_name, limit=limit)

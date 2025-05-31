@@ -28,7 +28,9 @@ DEFAULT_CONFIG = {
     "mediator": {
         "type": "silent",
         "model": "gemma3:latest"
-    }
+    },
+    "enforced_lens": False,
+    "language": "english"
 }
 def get_project_root():
     """Return the path to the project root directory."""
@@ -67,6 +69,14 @@ def normalize_config(user_cfg: dict) -> dict:
             cfg[key].update(val)
         else:
             cfg[key] = val
+
+    # Ensure enforced_lens is always present
+    if "enforced_lens" not in cfg:
+        cfg["enforced_lens"] = False
+
+    # Ensure language is always present
+    if "language" not in cfg:
+        cfg["language"] = "english"
 
     return cfg
 

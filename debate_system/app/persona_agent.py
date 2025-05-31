@@ -3,6 +3,7 @@ import time
 from typing import Callable, List, Dict, Optional
 import numpy as np
 import re
+from enum import Enum
 
 from app.core_llm import LLMClient
 from app.agent_state_tracker import AgentStateTracker
@@ -12,13 +13,45 @@ from app.discussion_lens import DiscussionLens
 
 logger = logging.getLogger(__name__)
 
+class PersonaStyle(Enum):
+    FORMAL = "formal"
+    HARDTONE = "hardtone"
+    ACADEMIC = "academic"
+    COACH = "coach"
+    POETIC = "poetic"
+    FRIENDLY = "friendly"
+    CRITICAL = "critical"
+    OPTIMISTIC = "optimistic"
+    MINIMALIST = "minimalist"
+    SELF_AWARE = "self-aware"
+
+STYLE_TO_INSTRUCTION = {
+    PersonaStyle.FORMAL: "High formality + authoritative voice + logical persuasion.",
+    PersonaStyle.HARDTONE: "Hard-toned + direct + compact paragraphs + high confidence.",
+    PersonaStyle.ACADEMIC: "Metacognitive + academic density + balanced confidence; includes reflection on limitations.",
+    PersonaStyle.COACH: "Warm tone + humble explainer voice + layperson technical level + diplomatic politeness.",
+    PersonaStyle.POETIC: "Figurative creativity + storyteller voice + expansive narrative mode.",
+    PersonaStyle.FRIENDLY: "Friendly, casual, and approachable tone.",
+    PersonaStyle.CRITICAL: "Analytical, skeptical, and challenging tone.",
+    PersonaStyle.OPTIMISTIC: "Upbeat, positive, and future-focused.",
+    PersonaStyle.MINIMALIST: "Extremely concise, minimal adjectives, no filler.",
+    PersonaStyle.SELF_AWARE: "Self-reflective, meta-cognitive, acknowledges own reasoning limits."
+}
+
 class PersonaAgent:
-    def __init__(self, name: str, role: str, temperature: float = 0.7, model: str = "gemma3:latest"):
+    def __init__(self, name: str, role: str, temperature: float = 0.7, model: str = "gemma3:latest", language: str = "english", style: str = "formal"):
         self.name = name
         self.role = role
         self.temperature = temperature
         self.model = model
+        self.language = language
+        # Map style string to enum, fallback to FORMAL
+        try:
+            self.style = PersonaStyle(style.lower())
+        except Exception:
+            self.style = PersonaStyle.FORMAL
         self.llm = LLMClient(model=self.model, temperature=self.temperature)
+        self.refinement_llm = LLMClient(model="qwen3:4b", temperature=self.temperature)
 
         self.agent_state_tracker = AgentStateTracker(agent_name=name, model=model, temperature=temperature)
         self.bayesian_tracker = None
@@ -26,14 +59,15 @@ class PersonaAgent:
         self.perf_logger = None
         self.contradiction_checker = ContradictionDetector()
 
-    def _compose_system_prompt(self, topic: str, opponent_argument: str = "", delphi_comment: str = "") -> str:
+    def _compose_system_prompt(self, topic: str, opponent_argument: str = "", delphi_comment: str = "", lens: str = None) -> str:
         beliefs = self.agent_state_tracker.memory_cache["beliefs"]
         contradiction_warning = self.agent_state_tracker.last_contradiction()
 
         prompt = f"""
-You are {self.name}, acting role as a {self.role} in a formal debate.
-Debate topic: "{topic}".
-
+You are {self.name}, acting role as a {self.role} in a formal debate.\nDebate topic: \"{topic}\".\n"""
+        if lens:
+            prompt += f"\n**Debate Lens/Perspective for this round:** {lens}\n"
+        prompt += """
 **Debate Protocol (follow strictly):**
 
 **Rules for Debate:**
@@ -102,14 +136,14 @@ Debate topic: "{topic}".
         
         return prompt
 
-    def _compose_system_prompt_second_sub_round(self, topic: str, opponent_argument: str = "", delphi_comment: str = "") -> str:
+    def _compose_system_prompt_second_sub_round(self, topic: str, opponent_argument: str = "", delphi_comment: str = "", lens: str = None) -> str:
         beliefs = self.agent_state_tracker.memory_cache["beliefs"]
         contradiction_warning = self.agent_state_tracker.last_contradiction()
-        
         prompt = f"""
-You are {self.name}, playing your role as a {self.role} in a structured multi-persona debate.
-Debate topic: "{topic}".
-
+You are {self.name}, playing your role as a {self.role} in a structured multi-persona debate.\nDebate topic: \"{topic}\".\n"""
+        if lens:
+            prompt += f"\n**Debate Lens/Perspective for this round:** {lens}\n"
+        prompt += """
 **Second Sub-Round Protocol (follow strictly):**
 
 1. **Empathetic Re-evaluation**  
@@ -137,9 +171,6 @@ Debate topic: "{topic}".
 
 DO NOT contradict your beliefs.
 """
-
-
-
         if contradiction_warning:
             prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
 
@@ -153,11 +184,9 @@ DO NOT contradict your beliefs.
         
         return prompt
 
-
-    def _compose_system_prompt_third_sub_round(self, topic: str, opponent_argument: str = "", delphi_comment: str = "") -> str:
+    def _compose_system_prompt_third_sub_round(self, topic: str, opponent_argument: str = "", delphi_comment: str = "", lens: str = None) -> str:
         beliefs = self.agent_state_tracker.memory_cache["beliefs"]
         contradiction_warning = self.agent_state_tracker.last_contradiction()
-
         prompt = f"""
 You are {self.name}, acting in your role as a {self.role} in a formal multi-persona debate.
 Debate topic: "{topic}".
@@ -188,8 +217,6 @@ Debate topic: "{topic}".
 • Total response ≤ 300 tokens.  
 • Maintain a neutral, facilitative tone.  
 """
-
-
         if contradiction_warning:
             prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
 
@@ -260,7 +287,8 @@ Stay neutral in tone and concise.
         stream_callback: Optional[Callable[[str], None]] = None,
         debate_history: Optional[list] = None,
         sub_round: int = 1,
-        phase: str = "NORMAL"
+        phase: str = "NORMAL",
+        lens: str = None
     ) -> str:
 
         logger.info(f"########### Agent {self.name} interacting with prompt: {user_prompt}")
@@ -277,13 +305,13 @@ Stay neutral in tone and concise.
         elif phase == "SUMMARY":
             self.system_prompt = self._compose_summary_prompt(topic)
         elif sub_round == 1:
-            self.system_prompt = self._compose_system_prompt(topic, opponent_argument, delphi_comment)
+            self.system_prompt = self._compose_system_prompt(topic, opponent_argument, delphi_comment, lens)
         elif sub_round == 2:
-            self.system_prompt = self._compose_system_prompt_second_sub_round(topic, opponent_argument, delphi_comment)
+            self.system_prompt = self._compose_system_prompt_second_sub_round(topic, opponent_argument, delphi_comment, lens)
         elif sub_round == 3:
-            self.system_prompt = self._compose_system_prompt_third_sub_round(topic, opponent_argument, delphi_comment)
+            self.system_prompt = self._compose_system_prompt_third_sub_round(topic, opponent_argument, delphi_comment, lens)
         else:
-            self.system_prompt = self._compose_system_prompt(topic, opponent_argument, delphi_comment)
+            self.system_prompt = self._compose_system_prompt(topic, opponent_argument, delphi_comment, lens)
 
         if not self.context_builder:
             self.context_builder = ContextBuilder(
@@ -335,19 +363,79 @@ Stay neutral in tone and concise.
             for part in important_parts:
                 self.agent_state_tracker.save_to_ltm(part)
                 
-        refinement_system_prompt = """"Create a more fluid text from the following points,
-        without changing the meaning. Use a more natural language and make it sound like a human wrote it, make smooth text, fluid to read, keeping paragraphs and pauses when necessary. 
-        You are {self.name}, acting role as a {self.role} in a formal debate.
-        DO NOT mention it, just return the fluid text. Do not add any extra information or context."""
+        # Add translation and style to refinement_system_prompt if needed
+        language = getattr(self, 'language', 'english')
+        style_enum = getattr(self, 'style', PersonaStyle.FORMAL)
+        style_instruction = STYLE_TO_INSTRUCTION.get(style_enum, STYLE_TO_INSTRUCTION[PersonaStyle.FORMAL])
+        
+        # Style rewriting prompt
+        system_prompt_style = f"""
+You are a language expert tasked with refining written text.
+
+## Objective:
+Create a more fluid text, without changing the meaning. Use a more natural language and make it sound like a human wrote it, make smooth text, fluid to read, keeping paragraphs and pauses when necessary using a writing style.
+
+## Instructions:
+- Rewrite the text in a more natural, human-like style.
+- Use the following style: {style_instruction}
+- Maintain the original meaning and structure.
+- Preserve all original ideas and logical flow
+- Add paragraph breaks when necessary and sentence tone.
+
+## Constraints:
+- Do **not** mention the style or that the text was rewritten.
+- Do **not** include any comments, summaries, or introductions.
+- Do **not** add new ideas or remove key content.
+- DO **not** use bullet points or lists.
+
+## Output:
+Only return the refined version of the input text. No explanations or notes.
+
+## Task:
+Rewrite the following:
+---
+"""
+        
+      
 
         logger.debug(f"[{self.name}] Response: {response}")
-        messagesRefinement = [{"role": "system", "content": refinement_system_prompt},
-                             {"role": "user", "content": response}]
-        responseFinal = self.llm.chat(messagesRefinement)
+        messagesRefinement = [
+            {"role": "system", "content": system_prompt_style},
+            {"role": "user", "content": response}
+        ]
+        # Use self.refinement_llm for the refinement/translation step
+        responseStyle = self.llm.chat(messagesRefinement)
+        
+        if language.lower() != "english":
+            # Pure translation prompt (no style instructions)
+            system_prompt_translate = f"""
+You are a professional translator.
+
+## Task:
+Translate the following text into {language.title()}.
+- Do not explain, comment, or add anything.
+- DO NOT change the meaning or structure.
+- Maintain the original tone and style.
+- DO NOT mention the translation process.
+- Just return the translated version.
+- Keep paragraph breaks and sentence tone.
+
+---
+"""
+
+            logger.debug(f"[{self.name}] Response: {response}")
+            messagesTranslated = [
+                {"role": "system", "content": system_prompt_translate},
+                {"role": "user", "content": responseStyle}
+            ]
+            # Use self.refinement_llm for the refinement/translation step
+            responseFinal = self.llm.chat(messagesTranslated)
+
+        else:
+            responseFinal = responseStyle
         
         if stream_callback:
             stream_callback(responseFinal)
-        
         return response
 
 

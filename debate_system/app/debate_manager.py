@@ -58,6 +58,8 @@ class DebateManager:
                 role=persona["role"],
                 temperature=persona.get("temperature", 0.7),
                 model=persona.get("model", "gemma3:latest"),
+                language=self.config.get("language", "english"),
+                style=persona.get("style", "formal")
             )
             self.agents.append(agent)
             self.agent_trackers[agent.name] = agent.agent_state_tracker
@@ -77,23 +79,28 @@ class DebateManager:
 
     def build_prompt(self, agent, round_num, sub_round=1, opponent_last="", delphi_comment="", theme=None, phase="NORMAL"):
         topic = self.config.get("topic", "")
-        if round_num == 0:
-            prompt = f"{topic} Round {round_num + 1}, your turn:"
-        else:
-            if theme is None and 1 <= (round_num - 3) <= 30:
-                idx = round_num - 3
-                try:
-                    theme = f"Please consider this perspective or lens: {DiscussionLens.get_theme(idx)} \n"
-                except Exception:
-                    theme = None
-            prompt = f"Topic: {topic}"
-            if opponent_last:
-                prompt += f"\n\nOpponent's last statement: {opponent_last.strip()}"
-            if theme is not None:
-                prompt += f" Debate Perspective: {theme}"
-            prompt += f"  Round {round_num + 1}, your turn: {agent.name}"
-            if delphi_comment:
-                prompt += f"\n\nSummary: {delphi_comment.strip()}"
+        enforced_lens = self.config.get("enforced_lens", False)
+        # Determine the lens/theme for this round if enforced
+        if enforced_lens and 1 <= (round_num - 3) <= 30:
+            idx = round_num - 3
+            try:
+                theme = f"Please consider this perspective or lens: {DiscussionLens.get_theme(idx)}"
+            except Exception:
+                theme = None
+        elif theme is None and 1 <= (round_num - 3) <= 30:
+            idx = round_num - 3
+            try:
+                theme = f"Please consider this perspective or lens: {DiscussionLens.get_theme(idx)}"
+            except Exception:
+                theme = None
+        prompt = f"Topic: {topic}"
+        if opponent_last:
+            prompt += f"\n\nOpponent's last statement: {opponent_last.strip()}"
+        if theme is not None:
+            prompt += f" Debate Perspective: {theme}"
+        prompt += f"  Round {round_num + 1}, your turn: {agent.name}"
+        if delphi_comment:
+            prompt += f"\n\nSummary: {delphi_comment.strip()}"
         return prompt
 
     def start(self, feedback_callback: Optional[Callable[[str], None]] = None):
@@ -163,6 +170,13 @@ class DebateManager:
 
                 # Build theme and delphi_comment for prompt
                 theme = None
+                enforced_lens = self.config.get("enforced_lens", False)
+                if enforced_lens and 1 <= (round_num - 3) <= 30:
+                    idx = round_num - 3
+                    try:
+                        theme = DiscussionLens.get_theme(idx)
+                    except Exception:
+                        theme = None
                 delphi_comment = next((r["content"] for r in reversed(self.debate_history) if r["agent"] == "Delphi"), "")
                 prompt = self.build_prompt(agent, round_num, sub_round=1, opponent_last=opponent_last, delphi_comment=delphi_comment, theme=theme, phase=sub_round_type)
 
@@ -191,7 +205,8 @@ class DebateManager:
                     stream_callback=lambda token: stream_to_ui(token, 1),
                     debate_history=self.debate_history,
                     sub_round=1,
-                    phase=sub_round_type
+                    phase=sub_round_type,
+                    lens=theme
                 )
 
                 
@@ -307,6 +322,14 @@ class DebateManager:
                 self._round_speakers = set()
                 # Use sub_round1_order directly, as it is now guaranteed unique and ordered
                 for agent in sub_round1_order:
+                    enforced_lens = self.config.get("enforced_lens", False)
+                    theme = None
+                    if enforced_lens and 1 <= (round_num - 3) <= 30:
+                        idx = round_num - 3
+                        try:
+                            theme = DiscussionLens.get_theme(idx)
+                        except Exception:
+                            theme = None
                     prompt = self.build_prompt(agent, round_num, sub_round=2, opponent_last=opponent_last, delphi_comment=delphi_comment, theme=theme)
                     response = ""
                     current_agent_name = agent.name
@@ -324,7 +347,8 @@ class DebateManager:
                         topic=topic,
                         stream_callback=lambda token: stream_to_ui2(token, 2),
                         debate_history=self.debate_history,
-                        sub_round=2
+                        sub_round=2,
+                        lens=theme
                     )
                     self.debate_history.append({
                         "round":     round_num + 1,
@@ -337,6 +361,9 @@ class DebateManager:
                 if self.needs_third_subround(self.debate_history, self.delphi_engine):
                     self._round_speakers = set()
                     for agent in sub_round1_order:
+                       
+                        theme = None
+                        
                         prompt = self.build_prompt(agent, round_num, sub_round=3, opponent_last=opponent_last, delphi_comment=delphi_comment, theme=theme)
                         
                         response = ""
@@ -354,7 +381,8 @@ class DebateManager:
                             topic=topic,
                             stream_callback=lambda token: stream_to_ui3(token, 3),
                             debate_history=self.debate_history,
-                            sub_round=3
+                            sub_round=3,
+                            lens=theme
                         )
                         self.debate_history.append({
                             "round":     round_num + 1,
