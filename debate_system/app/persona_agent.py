@@ -52,6 +52,7 @@ class PersonaAgent:
             self.style = PersonaStyle.FORMAL
         self.llm = LLMClient(model=self.model, temperature=self.temperature)
         self.refinement_llm = LLMClient(model="qwen3:4b", temperature=self.temperature)
+        self.meta_prompt_llm = LLMClient(model="llama3.2:3b", temperature=self.temperature)
 
         self.agent_state_tracker = AgentStateTracker(agent_name=name, model=model, temperature=temperature)
         self.bayesian_tracker = None
@@ -59,7 +60,49 @@ class PersonaAgent:
         self.perf_logger = None
         self.contradiction_checker = ContradictionDetector()
 
-    def _compose_system_prompt(self, topic: str, opponent_argument: str = "", delphi_comment: str = "", lens: str = None) -> str:
+    def _generate_meta_prompt(
+        self,
+        debate_history: List[Dict],
+        agent_beliefs: str,
+        opponent_argument: str,
+        sub_round: int,
+        lens: Optional[str] = None
+    ) -> str:
+        # Build a history string for context
+        history_str = ""
+        for turn in debate_history[-6:]:  # limit to last 6 turns for brevity
+            agent = turn.get("agent", "")
+            content = turn.get("content", "")
+            history_str += f"**{agent}:** {content}\n\n"
+
+        # Build prompt for the meta-LLM (use a different LLMClient if you want, or just self.llm)
+        meta_prompt = f"""
+    You are a debate strategy generator. Create 2-3 tactical instructions for the next agent's response to maximize human-like reasoning, nuance, and theme alignment. Prioritize these steps:
+
+1. **First, analyze the core conflict**:  
+   - Identify the most urgent issue in {opponent_argument.strip()}  
+   - Check {history_str} for circularity/repetition  
+   - Verify alignment with {agent_beliefs.strip()}  
+
+2. **Then prescribe actions**:  
+   - Mandatory: Choose **one** tactic (concede|challenge|synthesize|pivot)  
+   - Mandatory: Recommend **one** rhetorical device (question/story/analogy/emotion)  
+   - If {sub_round} > 2, prioritize breaking loops  
+   - {"Explicitly incorporate the **" + lens + "** perspective" if lens else ""}
+
+**OUTPUT REQUIREMENTS:**
+- Strictly 2-3 markdown bullets
+- Only executable instructions (no explanations)
+- Address contradictions/redundancies/unclarity when detected
+"""
+
+        # Call the LLM to generate the meta-prompt (swap to a dedicated model if desired)
+        response = self.meta_prompt_llm.chat([{"role": "system", "content": meta_prompt}])
+        return "**Meta-Guidance for This Turn:**\n" + response.strip() + "\n"
+
+
+
+    def _compose_system_prompt(self, topic: str, opponent_argument: str = "", delphi_comment: str = "", lens: str = None, meta: str = "") -> str:
         beliefs = self.agent_state_tracker.memory_cache["beliefs"]
         contradiction_warning = self.agent_state_tracker.last_contradiction()
 
@@ -74,7 +117,7 @@ You are {self.name}, acting role as a {self.role} in a formal debate.\nDebate to
 1. **Length & Structure**
 • ≤ 500 tokens in total.  
 • **Order matters:**  
-    ➀ *Definition* (1 sentence, ≤ 25 tokens).  
+    ➀ *Definition* (1 sentence, ≤ 25 tokens). Evaluate other's last definition if needed, try to reach a common ground, so both can use it on debate.
     ➁ *Steel-man* of opponent’s best point (≤ 40 tokens, see Rule 2). Find gaps, use it on *One direct question* if needed. 
     ➂ *Direct answers* to any questions.
     ➃ Up to **3 numbered points** (start with “1.”, “2.”, …; each ≤ 40 tokens).  
@@ -125,6 +168,12 @@ You are {self.name}, acting role as a {self.role} in a formal debate.\nDebate to
 
         if contradiction_warning:
             prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
+            
+        if meta:
+            prompt += f"\n\n## Meta-Guidance for This Turn:\n{meta.strip()}\n"
+            
+        if lens:
+            prompt += f"\n**Debate Lens:** {lens}\n"
 
         if opponent_argument:
             prompt += f"\n## Your Opponent's Last Statement:\n> {opponent_argument.strip()}"
@@ -132,11 +181,11 @@ You are {self.name}, acting role as a {self.role} in a formal debate.\nDebate to
         prompt += f"\n## Your Current Beliefs:\n{beliefs.strip()}"
         
         if delphi_comment:
-            prompt += f"\n\n## Previous Delphi Consensus:\n{delphi_comment.strip()}"
+            prompt += f"\n\n## Previous Delphi:\n{delphi_comment.strip()}"
         
         return prompt
 
-    def _compose_system_prompt_second_sub_round(self, topic: str, opponent_argument: str = "", delphi_comment: str = "", lens: str = None) -> str:
+    def _compose_system_prompt_second_sub_round(self, topic: str, opponent_argument: str = "", delphi_comment: str = "", lens: str = None, meta: str = "") -> str:
         beliefs = self.agent_state_tracker.memory_cache["beliefs"]
         contradiction_warning = self.agent_state_tracker.last_contradiction()
         prompt = f"""
@@ -173,6 +222,12 @@ DO NOT contradict your beliefs.
 """
         if contradiction_warning:
             prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
+        
+        if meta:
+            prompt += f"\n\n## Meta-Guidance for This Turn:\n{meta.strip()}\n"
+            
+        if lens:
+            prompt += f"\n**Debate Lens:** {lens}\n"
 
         if opponent_argument:
             prompt += f"\n## Your Opponent's Last Statement:\n> {opponent_argument.strip()}"
@@ -180,11 +235,11 @@ DO NOT contradict your beliefs.
         prompt += f"\n## Your Current Beliefs:\n{beliefs.strip()}"
         
         if delphi_comment:
-            prompt += f"\n\n{delphi_comment.strip()}"
+            prompt += f"\n\n## Previous Delphi:\n{delphi_comment.strip()}"
         
         return prompt
 
-    def _compose_system_prompt_third_sub_round(self, topic: str, opponent_argument: str = "", delphi_comment: str = "", lens: str = None) -> str:
+    def _compose_system_prompt_third_sub_round(self, topic: str, opponent_argument: str = "", delphi_comment: str = "", lens: str = None, meta: str = "") -> str:
         beliefs = self.agent_state_tracker.memory_cache["beliefs"]
         contradiction_warning = self.agent_state_tracker.last_contradiction()
         prompt = f"""
@@ -217,8 +272,15 @@ Debate topic: "{topic}".
 • Total response ≤ 300 tokens.  
 • Maintain a neutral, facilitative tone.  
 """
+        
         if contradiction_warning:
             prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
+        
+        if meta:
+            prompt += f"\n\n## Meta-Guidance for This Turn:\n{meta.strip()}\n"
+            
+        if lens:
+            prompt += f"\n**Debate Lens:** {lens}\n"
 
         if opponent_argument:
             prompt += f"\n## Opponent’s Last Statement:\n> {opponent_argument.strip()}"
@@ -226,7 +288,7 @@ Debate topic: "{topic}".
         prompt += f"\n## Your Beliefs:\n{beliefs.strip()}"
 
         if delphi_comment:
-            prompt += f"\n\nDelphi Summary:\n{delphi_comment.strip()}"
+            prompt += f"\n\n## Previous Delphi:\n{delphi_comment.strip()}"
 
         return prompt
 
@@ -251,6 +313,7 @@ Constraints:
 - No new evidence; use only material already cited.
 - Use headers **1-4** exactly.
 """
+        
         if contradiction_warning:
             prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
         prompt += f"\n## Your Current Beliefs:\n{beliefs.strip()}"
@@ -304,14 +367,33 @@ Stay neutral in tone and concise.
             self.system_prompt = self._compose_reflection_prompt(topic)
         elif phase == "SUMMARY":
             self.system_prompt = self._compose_summary_prompt(topic)
-        elif sub_round == 1:
-            self.system_prompt = self._compose_system_prompt(topic, opponent_argument, delphi_comment, lens)
-        elif sub_round == 2:
-            self.system_prompt = self._compose_system_prompt_second_sub_round(topic, opponent_argument, delphi_comment, lens)
-        elif sub_round == 3:
-            self.system_prompt = self._compose_system_prompt_third_sub_round(topic, opponent_argument, delphi_comment, lens)
+        elif sub_round in (1, 2, 3):
+            beliefs = self.agent_state_tracker.memory_cache["beliefs"]
+
+            # Only use meta-prompt if there is at least one previous turn
+            if debate_history and len(debate_history) > 0:
+                meta_prompt = self._generate_meta_prompt(
+                    debate_history,
+                    agent_beliefs=beliefs,
+                    opponent_argument=opponent_argument,
+                    sub_round=sub_round,
+                    lens=lens,
+                )
+            else:
+                logger.info("[PersonaAgent] Skipping meta-prompt for first round: no debate history yet.")
+                meta_prompt = ""  # No meta-guidance on first round
+
+            if sub_round == 1:
+                base_prompt = self._compose_system_prompt(topic, opponent_argument, delphi_comment, lens, meta_prompt)
+            elif sub_round == 2:
+                base_prompt = self._compose_system_prompt_second_sub_round(topic, opponent_argument, delphi_comment, lens, meta_prompt)
+            elif sub_round == 3:
+                base_prompt = self._compose_system_prompt_third_sub_round(topic, opponent_argument, delphi_comment, lens, meta_prompt)
+
+            self.system_prompt = base_prompt
         else:
             self.system_prompt = self._compose_system_prompt(topic, opponent_argument, delphi_comment, lens)
+
 
         if not self.context_builder:
             self.context_builder = ContextBuilder(
@@ -337,14 +419,7 @@ Stay neutral in tone and concise.
 
         response = ""
         start = time.time()
-        # for token in self.llm.stream_chat(messages):
-        #     print(token, end="", flush=True)
-        #     response += token
-        #     if stream_callback:
-        #         stream_callback(token)
         response = self.llm.chat(messages)
-        # if stream_callback:
-        #     stream_callback(response)
         end = time.time()
 
         if self.perf_logger:
@@ -377,6 +452,9 @@ Create a more fluid text, without changing the meaning. Use a more natural langu
 
 ## Instructions:
 - Rewrite the text in a more natural, human-like style.
+- Remove all Markdown formatting, including headings, lists, and section titles. Convert all content to natural paragraphs.
+- If the input contains numbered sections, bullet points, or headings, merge and paraphrase them into flowing text.
+- Do not use any Markdown symbols (such as #, ##, -, *, 1., 2., etc.) in your output.
 - Use the following style: {style_instruction}
 - Maintain the original meaning and structure.
 - Preserve all original ideas and logical flow
@@ -409,7 +487,7 @@ Rewrite the following:
         if language.lower() != "english":
             # Pure translation prompt (no style instructions)
             system_prompt_translate = f"""
-You are a professional translator.
+You are a professional translator, return only the translated text.
 
 ## Task:
 Translate the following text into {language.title()}.

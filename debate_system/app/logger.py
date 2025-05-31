@@ -41,16 +41,6 @@ def save_log_files(
     with open(path + "summary.md", "w") as f:
         f.write("\n\n".join(md_lines))
 
-    # ── JSON OUTPUT ───────────────────────────────
-    json_out = {
-        "config": config,
-        "transcript": transcript,
-        "consensus": consensus_block,
-        "argument_graph": graph.export_json(),
-    }
-
-    with open(path + "summary.json", "w") as f:
-        json.dump(json_out, f, indent=2)
 
     print(f"📤 Logs saved to {path}summary.md and summary.json")
 

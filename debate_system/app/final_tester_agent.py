@@ -37,8 +37,7 @@ class FinalTesterAgent:
 
         system_prompt = (
             "You are a formal debate auditor. Your task is to evaluate the debate's logical consistency, "
-            "belief coherence, contradiction patterns, and argument structure. Identify strengths, flaws, "
-            "and suggest improvements if needed."
+            "belief coherence, contradiction patterns, and argument structure. After your analises, create a summary of the debate, pin pointing the consensus, highlighting the key points, definitions and what else we can extract as insights."
         )
 
         user_prompt = f"""
