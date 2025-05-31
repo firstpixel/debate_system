@@ -26,24 +26,32 @@ personas:
     model: "gemma3:latest"
     role: "Utopian Technologist"
     temperature: 0.9
+    style: "optimistic"
   - name: "EngineerAI"
     model: "gemma3:latest"
     role: "AI Software engineer"
     temperature: 0.1
+    style: "minimalist"
   - name: "EconoLogix"
     model: "gemma3:latest"
     role: "Capitalist Economist"
     temperature: 0.7
+    style: "hardtone"
   - name: "CivEthica"
     model: "gemma3:latest"
     role: "Ethics Professor"
     temperature: 0.65
+    style: "formal"
   - name: "MetaCogito"
     model: "gemma3:latest"
     role: "AI Philosophy Researcher"
     temperature: 0.95
+    style: "self-aware"
 
 mediator:
-  type: active
+  type: summarizer
   model: "gemma3:latest"
+
+enforced_lens: true
+language: english
 
