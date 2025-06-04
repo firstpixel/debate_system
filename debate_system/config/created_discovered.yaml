@@ -1,0 +1,36 @@
+topic: "Were the laws of mathematics and physics discovered or created?"
+rounds: 20
+use_mediator: true
+consensus_strategy: mediator_summary
+turn_strategy: round_robin
+
+delphi:
+  enabled: true
+  rounds: 1
+  summary_style: bullet_points
+
+personas:
+  - name: "PlatonistMathematician"
+    model: "gemma3:latest"
+    role: "Mathematical Platonist who argues that abstract entities exist independently of minds; laws are discovered truths of a timeless realm."
+    temperature: 0.9
+    style: "formal"
+
+  - name: "ConstructivistPhilosopher"
+    model: "gemma3:latest"
+    role: "Constructivist philosopher contending that mathematical and physical laws are human-made conceptual frameworks shaped by culture and utility."
+    temperature: 0.6
+    style: "critical"
+
+  - name: "PragmaticPhysicist"
+    model: "gemma3:latest"
+    role: "Empirically minded physicist who blends discovery and invention, focusing on how well models predict experiments regardless of metaphysics."
+    temperature: 0.4
+    style: "academic"
+
+mediator:
+  type: summarizer
+  model: "gemma3:latest"
+
+enforced_lens: true
+language: english

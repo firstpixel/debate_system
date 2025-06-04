@@ -9,7 +9,6 @@ from app.core_llm import LLMClient
 from app.agent_state_tracker import AgentStateTracker
 from app.contradiction_detector import ContradictionDetector
 from app.context_builder import ContextBuilder
-from app.discussion_lens import DiscussionLens
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +50,8 @@ class PersonaAgent:
         except Exception:
             self.style = PersonaStyle.FORMAL
         self.llm = LLMClient(model=self.model, temperature=self.temperature)
-        self.refinement_llm = LLMClient(model="qwen3:4b", temperature=self.temperature)
-        self.meta_prompt_llm = LLMClient(model="llama3.2:3b", temperature=self.temperature)
+        self.refinement_llm = LLMClient(model="gemma3:12b", temperature=self.temperature)
+        self.meta_prompt_llm = LLMClient(model="gemma3:12b", temperature=self.temperature)
 
         self.agent_state_tracker = AgentStateTracker(agent_name=name, model=model, temperature=temperature)
         self.bayesian_tracker = None
@@ -162,6 +161,7 @@ You are {self.name}, acting role as a {self.role} in a formal debate.\nDebate to
 • Keep your self coherent to your ROLE.
 • Prevent contradictions by checking your BELIEFS, DO NOT contradict your beliefs.
 
+Reminder: speak in the **first person**. Do **not** describe yourself or your previous responses.
 """
 
 
@@ -219,6 +219,8 @@ You are {self.name}, playing your role as a {self.role} in a structured multi-pe
 • Neutral, facilitative tone—avoid advocacy language.
 
 DO NOT contradict your beliefs.
+Reminder: speak in the **first person**. Do **not** describe yourself or your previous responses.
+
 """
         if contradiction_warning:
             prompt += f"\n⚠️ Contradiction Alert:\n{contradiction_warning.strip()}\n"
@@ -271,6 +273,7 @@ Debate topic: "{topic}".
 • Use exactly these six sections—no extras.  
 • Total response ≤ 300 tokens.  
 • Maintain a neutral, facilitative tone.  
+Reminder: speak in the **first person**. Do **not** describe yourself or your previous responses.
 """
         
         if contradiction_warning:
@@ -312,6 +315,7 @@ Sections (≤ 2000 tokens total):
 Constraints:
 - No new evidence; use only material already cited.
 - Use headers **1-4** exactly.
+Reminder: speak in the **first person**. Do **not** describe yourself or your previous responses.
 """
         
         if contradiction_warning:
@@ -337,6 +341,8 @@ Sections (≤ 3000 tokens total):
 
 Use headings 1-5 exactly.
 Stay neutral in tone and concise.
+Reminder: speak in the **first person**. Do **not** describe yourself or your previous responses.
+
 """
         prompt += f"\n\n## Your Beliefs:\n{beliefs.strip()}"
         return prompt
@@ -445,7 +451,9 @@ Stay neutral in tone and concise.
         
         # Style rewriting prompt
         system_prompt_style = f"""
-You are a language expert tasked with refining written text.
+You are a language expert tasked with refining written text for persona:{self.name}.
+Reminder: speak in the **first person**. Do **not** describe yourself or your previous responses as thrid person, adjust any thrid person of {self.name} to first person.
+
 
 ## Objective:
 Create a more fluid text, without changing the meaning. Use a more natural language and make it sound like a human wrote it, make smooth text, fluid to read, keeping paragraphs and pauses when necessary using a writing style.
@@ -459,6 +467,7 @@ Create a more fluid text, without changing the meaning. Use a more natural langu
 - Maintain the original meaning and structure.
 - Preserve all original ideas and logical flow
 - Add paragraph breaks when necessary and sentence tone.
+- Reminder: speak in the **first person**. Do **not** describe yourself or your previous responses as thrid person, adjust any thrid person of {self.name} to first person.
 
 ## Constraints:
 - Do **not** mention the style or that the text was rewritten.
@@ -482,7 +491,7 @@ Rewrite the following:
             {"role": "user", "content": response}
         ]
         # Use self.refinement_llm for the refinement/translation step
-        responseStyle = self.llm.chat(messagesRefinement)
+        responseStyle = self.refinement_llm.chat(messagesRefinement)
         
         if language.lower() != "english":
             # Pure translation prompt (no style instructions)

@@ -1,0 +1,48 @@
+topic: "how to create an AI developer with local llm, ollama and python? It should create a design document from user input, a task list and execute the tasklist, and be able to self improve and self-repair. Have a broad discussion on all possibilities and approaches to achieve this goal."
+
+rounds: 20
+use_mediator: true
+consensus_strategy: mediator_summary
+turn_strategy: round_robin
+context_scope: rolling
+logging_mode: markdown+json
+argument_tree: true
+bayesian_tracking: true
+
+delphi:
+  enabled: true
+  rounds: 1
+  summary_style: bullet_points
+
+enforced_lens: true
+language: english
+
+personas:
+  - name: "SystemArchitect"
+    model: "gemma3:4b"  # Creative
+    role: "Focus on modular design, system reliability, flow control, agent interfaces, and protocols"
+    temperature: 0.7
+    style: "formal"
+
+  - name: "OrchestratorDesigner"
+    model: "llama3.2:3b"  # Conversational
+    role: "Specializes in execution control, loop closure, feedback validation, and FSMs"
+    temperature: 0.75
+    style: "critical"
+
+  - name: "ToolsmithEngineer"
+    model: "phi3.5:3.8b"  # Analytical
+    role: "Focused on tool chaining, code execution, Docker safety, and structured output parsing"
+    temperature: 0.65
+    style: "hardtone"
+
+  - name: "CognitiveAIResearcher"
+    model: "huihui_ai/nemotron-v1-abliterated"  # Contextual
+    role: "Analyzes metacognition, self-repair, long-term planning, agent memory and autonomy"
+    temperature: 0.8
+    style: "self-aware"
+
+mediator:
+  type: summarizer
+  model: "gemma3:latest"
+  style: "critical"

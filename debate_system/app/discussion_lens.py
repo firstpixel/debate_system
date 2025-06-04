@@ -93,15 +93,33 @@ class DiscussionLens:
         15: "Critique & Meta-Reflection"
     }
 
+    THEMES_AUTODEV_ARCHITECTURE: Dict[int, str] = {
+        1:  "System Architecture & Modularity",                       # Microservices, plug-and-play agent design
+        2:  "Agent Roles & Task Delegation",                          # Planner, Builder, Tester, Debugger
+        3:  "Orchestration & Flow Control",                           # FSMs, behavior trees, priority queues
+        4:  "Feedback Loops & Retry Logic",                           # Validation, self-correction, memory inspection
+        5:  "Memory Systems & Context Management",                    # STM (Mongo), LTM (Qdrant), summarization
+        6:  "Tooling & Code Execution Safety",                        # Python execution, Docker, output parsing
+        7:  "Error Detection & Validation Strategies",                # Compilers, test agents, LLM-based validators
+        8:  "Autonomy & Decision-Making Models",                      # Single-step vs reflective/multi-round
+        9:  "Model Selection & Resource Constraints",                 # LLM size, GPU use, latency, cost
+        10: "Security, Containment & Isolation",                      # Sandbox tools, prompt injection defenses
+        11: "Explainability & Observability",                         # Logging, real-time feedback, tracing
+        12: "Scalability & Distributed Execution",                    # Task queues, horizontal scaling, GPU pooling
+        13: "Knowledge Integration & RAG Systems",                    # Docs, APIs, repo ingestion, RAG to reasoning
+        14: "Human Feedback & Hybrid Collaboration",                  # When to involve users, streamlit/FastAPI UI
+        15: "Meta-Evaluation & Continuous Improvement"                # Agent reflection, debate evaluation, belief update
+    }
+
 
     @classmethod
     def get_theme(cls, round_number: int) -> str:
         """
         Return the theme for the given round.
         """
-        if round_number not in cls.THEMES_SOCIETY_TECH:
+        if round_number not in cls.THEMES_AUTODEV_ARCHITECTURE:
             return f"Free Round, no lens defined for round {round_number}."
-        return cls.THEMES_SOCIETY_TECH[round_number]
+        return cls.THEMES_AUTODEV_ARCHITECTURE[round_number]
 
 
 # # --- Usage Example ---

@@ -1,0 +1,46 @@
+topic: "Can the future be precisely predicted if all physical variables are known?"
+rounds: 20
+use_mediator: true
+consensus_strategy: mediator_summary
+turn_strategy: round_robin
+delphi:
+  enabled: true
+  rounds: 1
+  summary_style: bullet_points
+personas:
+  - name: "Determinist"
+    model: "gemma3:4b"  # Creative
+    role: "Classical physicist who believes the universe is fully governed by deterministic laws; invokes Laplace's Demon and Newtonian predictability."
+    temperature: 0.7
+    style: "formal"
+
+  - name: "QuantumAgent"
+    model: "phi3.5:3.8b"  # Analytical
+    role: "Quantum physicist grounded in the Copenhagen interpretation; argues that fundamental quantum uncertainty limits predictability of the future."
+    temperature: 0.75
+    style: "academic"
+
+  - name: "ChaosPhilosopher"
+    model: "llama3.2:3b"  # Conversational
+    role: "Mathematical philosopher focused on chaos theory; asserts that even deterministic systems are practically unpredictable due to sensitivity to initial conditions."
+    temperature: 0.8
+    style: "critical"
+
+  - name: "MetaCognitivistFutureist"
+    model: "huihui_ai/nemotron-v1-abliterated"  # Contextual
+    role: "Theorist of mind and consciousness; believes subjective experience or free will may introduce irreducible uncertainty not captured by physics alone."
+    temperature: 0.85
+    style: "self-aware"
+
+mediator:
+  type: summarizer
+  model: "gemma3:latest"
+enforced_lens: true
+language: english
+
+
+# Persona	Model	Characteristics
+# Creative	Gemma3:4B	Imaginative and expressive responses.
+# Conversational	Llama3.2:3B	Friendly and engaging interactions.
+# Analytical	Phi3.5:3.8B	Logical and concise reasoning.
+# Contextual	huihui_ai/nemotron-v1-abliterated	Handles extensive context effectively.

@@ -1,0 +1,42 @@
+## ✅ Placeholder `config.yaml` for immediate testing
+
+topic: "How completely can mathematics capture every aspect of reality, and what bearing does this have on the likelihood that our universe is a simulation?"
+rounds: 20
+use_mediator: true
+consensus_strategy: mediator_summary
+turn_strategy: round_robin
+delphi:
+  enabled: true
+  rounds: 1
+  summary_style: bullet_points
+
+personas:
+  - name: "Mathematical Platonist"
+    model: "gemma3:latest"
+    role: "Believes the universe *is* a timeless mathematical structure. Reality is discovered, not created, and all phenomena ultimately reduce to abstract relations."
+    temperature: 0.7
+    style: "formal"
+
+  - name: "Physical Computationalist"
+    model: "gemma3:latest"
+    role: "Argues that the cosmos is an information-processing system; anything mathematically describable is, in principle, computable and thus simulatable."
+    temperature: 0.8
+    style: "hardtone"
+
+  - name: "Phenomenological Anti-Reductionist"
+    model: "gemma3:latest"
+    role: "Claims that lived experience and qualitative aspects of reality resist full mathematical capture; therefore, mathematical models and simulations are always partial."
+    temperature: 0.9
+    style: "academic"
+
+  - name: "Metaphysical Idealist"
+    model: "gemma3:latest"
+    role: "Maintains that reality is rooted in mind or awareness; mathematics and any possible simulation are expressions within a broader mental substrate."
+    temperature: 0.85
+    style: "poetic"
+
+mediator:
+  type: summarizer
+  model: "gemma3:latest"
+enforced_lens: true
+language: english
