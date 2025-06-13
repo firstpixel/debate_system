@@ -52,6 +52,7 @@ class PersonaAgent:
         self.llm = LLMClient(model=self.model, temperature=self.temperature)
         self.refinement_llm = LLMClient(model="gemma3:12b", temperature=self.temperature)
         self.meta_prompt_llm = LLMClient(model="gemma3:12b", temperature=self.temperature)
+        self.translate_llm = LLMClient(model="gemma3:12b", temperature=self.temperature)
 
         self.agent_state_tracker = AgentStateTracker(agent_name=name, model=model, temperature=temperature)
         self.bayesian_tracker = None
@@ -516,7 +517,7 @@ Translate the following text into {language.title()}.
                 {"role": "user", "content": responseStyle}
             ]
             # Use self.refinement_llm for the refinement/translation step
-            responseFinal = self.llm.chat(messagesTranslated)
+            responseFinal = self.translate_llm.chat(messagesTranslated)
 
         else:
             responseFinal = responseStyle

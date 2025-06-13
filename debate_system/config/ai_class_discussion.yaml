@@ -38,4 +38,4 @@ mediator:
   type: summarizer
   model: "gemma3:latest"
 enforced_lens: true
-language: english
+language: portuguese
