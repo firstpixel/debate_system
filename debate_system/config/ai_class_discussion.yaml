@@ -37,3 +37,5 @@ personas:
 mediator:
   type: summarizer
   model: "gemma3:latest"
+enforced_lens: true
+language: english
