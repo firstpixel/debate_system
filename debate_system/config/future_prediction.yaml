@@ -9,19 +9,19 @@ delphi:
   summary_style: bullet_points
 personas:
   - name: "Determinist"
-    model: "gemma3:4b"  # Creative
+    model: "huihui_ai/gemma3-abliterated:4b"  # Creative
     role: "Classical physicist who believes the universe is fully governed by deterministic laws; invokes Laplace's Demon and Newtonian predictability."
     temperature: 0.7
     style: "formal"
 
   - name: "QuantumAgent"
-    model: "phi3.5:3.8b"  # Analytical
+    model: "huihui_ai/qwen2.5-1m-abliterated:7b"  # Analytical
     role: "Quantum physicist grounded in the Copenhagen interpretation; argues that fundamental quantum uncertainty limits predictability of the future."
     temperature: 0.75
     style: "academic"
 
   - name: "ChaosPhilosopher"
-    model: "llama3.2:3b"  # Conversational
+    model: "huihui_ai/llama3.2-abliterate:3b"  # Conversational
     role: "Mathematical philosopher focused on chaos theory; asserts that even deterministic systems are practically unpredictable due to sensitivity to initial conditions."
     temperature: 0.8
     style: "critical"
@@ -34,7 +34,7 @@ personas:
 
 mediator:
   type: summarizer
-  model: "gemma3:latest"
+  model: "huihui_ai/gemma3-abliterated:4b"
 enforced_lens: true
 language: english
 

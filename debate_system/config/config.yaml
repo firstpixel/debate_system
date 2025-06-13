@@ -11,19 +11,19 @@ delphi:
   summary_style: bullet_points
 personas:
   - name: "TechAdvocate"
-    model: "gemma3:latest"
+    model: "huihui_ai/llama3.2-abliterate:3b"
     role: "Pro-AI, AI Enthusiast, Optimist, UBI supporter, AI will free humans from working"
     temperature: 0.8
     style: "self-aware"
   - name: "Ethicist"
-    model: "gemma3:latest"
+    model: "huihui_ai/nemotron-v1-abliterated"
     role: "AI Skeptic, Ethical Concerns, Human-Centric, Negationist of AI, AI is simple automation, economy crash, jobs have existence meaning"
     temperature: 0.4
     style: "academic"
 
 mediator:
   type: summarizer
-  model: "gemma3:latest"
+  model: "huihui_ai/llama3.2-abliterate:3b"
 enforced_lens: true
 language: english
 

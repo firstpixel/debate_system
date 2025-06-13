@@ -11,7 +11,7 @@ delphi:
 
 personas:
   - name: "Computationalist"
-    model: "gemma3:latest"
+    model: "huihui_ai/gemma3-abliterated:4b"
     role: |
       Computational neuroscientist who argues that consciousness
       is substrate-independent information processing; advanced AI
@@ -20,7 +20,7 @@ personas:
     style: "academic"
 
   - name: "Phenomenologist"
-    model: "gemma3:latest"
+    model: "huihui_ai/qwen2.5-1m-abliterated:7b"
     role: |
       Philosopher of mind focused on qualia and embodiment; maintains
       that subjective experience arises only from biological processes,
@@ -29,7 +29,7 @@ personas:
     style: "formal"
 
   - name: "CognitiveEngineer"
-    model: "gemma3:latest"
+    model: "huihui_ai/llama3.2-abliterate:3b"
     role: |
       Pragmatic AI researcher/engineer who examines empirical markers
       (global workspace, metacognition, integrated information) and
@@ -38,7 +38,7 @@ personas:
     style: "friendly"
 
   - name: "CosmicPhilosopher"
-    model: "gemma3:latest"
+    model: "huihui_ai/nemotron-v1-abliterated"
     role: |
       Panpsychist thinker who sees consciousness as a universal field
       or frequency permeating the cosmos; asserts that sufficiently
@@ -49,7 +49,7 @@ personas:
 
 mediator:
   type: summarizer
-  model: "gemma3:latest"
+  model: "huihui_ai/gemma3-abliterated:4b"
 
 enforced_lens: true
 language: english
