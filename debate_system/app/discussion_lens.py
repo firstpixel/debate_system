@@ -111,15 +111,32 @@ class DiscussionLens:
         15: "Meta-Evaluation & Continuous Improvement"                # Agent reflection, debate evaluation, belief update
     }
 
+    AI_EDUCATION_LENSES: dict[int, str] = {
+        1:  "Definitions and History of Artificial Intelligence",
+        2:  "Weak AI vs. Strong AI",
+        3:  "Practical Applications of AI Today",
+        4:  "Machine Learning: Types of Learning (Supervised, Unsupervised, Reinforcement)",
+        5:  "Neural Networks: Structure and Functioning",
+        6:  "Deep Learning: CNNs, RNNs, Transformers",
+        7:  "Development Tools in AI (Python, Ollama, MongoDB, Qdrant)",
+        8:  "Managing Context in LLMs: Chunking, Embeddings, and RAG",
+        9:  "AI Project Development Pipeline (Brainstorm to Execution, Design document, Task list and LLM executing tasks)",
+        10: "Project Highlight: LLM Function call testing(List of tasks and LLM must select a function to call) and Prompt Engineering(Techniques for effective prompts)",
+        11: "Project Highlight: RAG(Simple RAG system with Qdrant), Universal Extractor(Extract content for context off youtube videos, papers, github), Semantic Search(Search on Qdrant)",
+        12: "Project Highlight: Agent Society(agents on 20x20 grid with food and life limit) and Timeline Generator(Generate a timeline based on a subject)",
+        13: "Project Highlight: Autonomous Debate Engine(Multiple llm debating about any subject with delphi and bayesian approaches)",
+        14: "Project Highlight: Racing Game(Game developed by AI) and Cognitive Agents(Agents that can reason about their own beliefs and actions)",
+        15: "Future of AI: Ethics, Theory of Mind, and AGI"
+    }
 
     @classmethod
     def get_theme(cls, round_number: int) -> str:
         """
         Return the theme for the given round.
         """
-        if round_number not in cls.THEMES_PHILOSOPHY:
+        if round_number not in cls.AI_EDUCATION_LENSES:
             return f"Free Round, no lens defined for round {round_number}."
-        return cls.THEMES_PHILOSOPHY[round_number]
+        return cls.AI_EDUCATION_LENSES[round_number]
 
 
 # # --- Usage Example ---
