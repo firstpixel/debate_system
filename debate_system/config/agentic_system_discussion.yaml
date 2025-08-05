@@ -1,0 +1,34 @@
+topic: "Best approach to build an agentic system with LLMs for web page development"
+rounds: 20
+use_mediator: true
+consensus_strategy: mediator_summary
+turn_strategy: round_robin
+
+delphi:
+  enabled: true
+  rounds: 1
+  summary_style: bullet_points
+
+personas:
+  - name: "PragmaticAgent"
+    model: "huihui_ai/llama3.2-abliterate:3b"
+    role: A pragmatic software engineer focused on applying LLMs to rapidly generate
+      functional web pages. Highlights development practices, tool selection,
+      agent orchestration, and real-world model limitations.
+    temperature: 0.9
+    style: "friendly"
+
+  - name: "MethodicalProfessor"
+    model: "huihui_ai/gemma3-abliterated:4b"
+    role: A professor specializing in Artificial Intelligence who teaches foundational
+      concepts using clear analogies and structured explanations. Tends to validate
+      theories before applying them, emphasizing best practices.
+    temperature: 0.6
+    style: "didactic"
+
+mediator:
+  type: summarizer
+  model: "gemma3:12b"
+
+enforced_lens: true
+language: portuguese

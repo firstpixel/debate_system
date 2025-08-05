@@ -1,0 +1,29 @@
+topic: "What is the best political system for a fair and prosperous society, and how could a new, more inclusive system be designed to benefit all citizens?"
+rounds: 40
+use_mediator: true
+consensus_strategy: mediator_summary
+turn_strategy: round_robin
+
+delphi:
+  enabled: true
+  rounds: 1
+  summary_style: bullet_points
+
+personas:
+  - name: "RightWing"
+    model: "huihui_ai/llama3.2-abliterate:3b"
+    role: "Ultra-conservative, Free-market Defender, Nationalist, Minimal Government, Individual Liberty Champion, Traditional Values Advocate, Pro-business, Skeptical of Welfare, Prefers Strong National Identity"
+    temperature: 0.8
+    style: "hardtone"
+  - name: "LeftWing"
+    model: "huihui_ai/nemotron-v1-abliterated"
+    role: "Ultra-progressive, Socialist, Advocate of State-led Redistribution, Social Justice Proponent, Pro-regulation, Climate Action Champion, Supporter of Universal Welfare, Critical of Traditional Power Structures"
+    temperature: 0.8
+    style: "hardtone"
+
+mediator:
+  type: summarizer
+  model: "huihui_ai/gemma3-abliterated:4b"
+
+enforced_lens: true
+language: english

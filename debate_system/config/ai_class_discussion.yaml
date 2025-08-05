@@ -1,5 +1,5 @@
 topic: "Comprehensive Introduction to Artificial Intelligence"
-rounds: 15
+rounds: 20
 use_mediator: true
 consensus_strategy: mediator_summary
 turn_strategy: round_robin
@@ -9,33 +9,24 @@ delphi:
   rounds: 1
   summary_style: bullet_points
 
-enforced_lens: true
-language: english
 
 personas:
-  - name: "TeacherAI"
-    model: "llama3.2:3b"
-    role: |
-      A dedicated educator specializing in Artificial Intelligence. Focuses on teaching foundational concepts clearly using analogies and structured explanations.
-    temperature: 0.5
-    style: "didactic"
-
   - name: "PragmaticEngineer"
-    model: "phi3.5:3.8b"
+    model: "huihui_ai/llama3.2-abliterate:3b"
     role: |
       A software engineer who applies AI in real-world systems. Focuses on tools, development practices, architectural design, and real model limitations.
-    temperature: 0.7
-    style: "technical"
+    temperature: 0.9
+    style: "friendly"
 
-  - name: "CriticalFuturist"
-    model: "gemma3:4b"
+  - name: "TeacherAI"
+    model: "huihui_ai/gemma3-abliterated:4b"
     role: |
-      A philosophical futurist reflecting on AI’s impact on society. Brings critical thought about AGI, ethics, human roles, and the future of labor and cognition.
-    temperature: 0.8
-    style: "reflective"
-
+      A dedicated educator specializing in Artificial Intelligence. Focuses on teaching foundational concepts clearly using analogies and structured explanations. Try not to debate, but to teach.
+    temperature: 0.6
+    style: "didactic"
 mediator:
   type: summarizer
-  model: "gemma3:latest"
+  model: "gemma3:27b"
+
 enforced_lens: true
 language: portuguese

@@ -8,9 +8,10 @@ from typing import List, Dict, Generator
 
 
 class LLMClient:
-    def __init__(self, model: str = "gemma3:latest", temperature: float = 0.7):
+    def __init__(self, model: str = "gemma3:latest", temperature: float = 0.7, num_predict: int = 512):
         self.model = model
         self.temperature = temperature
+        self.num_predict = num_predict
         self.client = Client()
 
     def chat(self, messages: List[Dict]) -> str:
@@ -25,7 +26,7 @@ class LLMClient:
                 "top_p": 0.9,
                 "frequency_penalty": 0.2,
                 "presence_penalty": 0.3,
-                "num_predict": 512,
+                "num_predict": self.num_predict,
                 # "num_gpu": 1,  # Ensure we use GPU
                 "num_ctx": 16384,
                 "mmap": True,  # Enable memory mapping for better performance
@@ -44,7 +45,7 @@ class LLMClient:
                 "top_p": 0.9,
                 "frequency_penalty": 0.1,
                 "presence_penalty": 0.2,
-                "num_predict": 512,
+                "num_predict": self.num_predict,
                 # "num_gpu": 1,  # Ensure we use GPU
                 # "num_ctx": 4096,
                 "mmap": True,  # Enable memory mapping for better performance

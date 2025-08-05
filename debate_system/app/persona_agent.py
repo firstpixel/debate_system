@@ -23,6 +23,7 @@ class PersonaStyle(Enum):
     OPTIMISTIC = "optimistic"
     MINIMALIST = "minimalist"
     SELF_AWARE = "self-aware"
+    DIDACTIC = "didactic"
 
 STYLE_TO_INSTRUCTION = {
     PersonaStyle.FORMAL: "High formality + authoritative voice + logical persuasion.",
@@ -34,8 +35,9 @@ STYLE_TO_INSTRUCTION = {
     PersonaStyle.CRITICAL: "Analytical, skeptical, and challenging tone.",
     PersonaStyle.OPTIMISTIC: "Upbeat, positive, and future-focused.",
     PersonaStyle.MINIMALIST: "Extremely concise, minimal adjectives, no filler.",
-    PersonaStyle.SELF_AWARE: "Self-reflective, meta-cognitive, acknowledges own reasoning limits."
-}
+    PersonaStyle.SELF_AWARE: "Self-reflective, meta-cognitive, acknowledges own reasoning limits.",
+    PersonaStyle.DIDACTIC: "Educational, figurative storyteller, explanatory, and instructive tone."
+    }
 
 class PersonaAgent:
     def __init__(self, name: str, role: str, temperature: float = 0.7, model: str = "gemma3:latest", language: str = "english", style: str = "formal"):
@@ -51,8 +53,8 @@ class PersonaAgent:
             self.style = PersonaStyle.FORMAL
         self.llm = LLMClient(model=self.model, temperature=self.temperature)
         self.refinement_llm = LLMClient(model="gemma3:12b", temperature=self.temperature)
-        self.meta_prompt_llm = LLMClient(model="gemma3:12b", temperature=self.temperature)
-        self.translate_llm = LLMClient(model="gemma3:12b", temperature=self.temperature)
+        self.meta_prompt_llm = LLMClient(model="gemma3:12b", temperature=self.temperature, num_predict=1024)
+        self.translate_llm = LLMClient(model="gemma3:12b", temperature=self.temperature, num_predict=2048)
 
         self.agent_state_tracker = AgentStateTracker(agent_name=name, model=model, temperature=temperature)
         self.bayesian_tracker = None
@@ -115,7 +117,7 @@ You are {self.name}, acting role as a {self.role} in a formal debate.\nDebate to
 
 **Rules for Debate:**
 1. **Length & Structure**
-• ≤ 500 tokens in total.  
+• ≤ 300 tokens in total.  
 • **Order matters:**  
     ➀ *Definition* (1 sentence, ≤ 25 tokens). Evaluate other's last definition if needed, try to reach a common ground, so both can use it on debate.
     ➁ *Steel-man* of opponent’s best point (≤ 40 tokens, see Rule 2). Find gaps, use it on *One direct question* if needed. 
@@ -272,7 +274,7 @@ Debate topic: "{topic}".
 
 **Output Constraints:**  
 • Use exactly these six sections—no extras.  
-• Total response ≤ 300 tokens.  
+• Total response ≤ 200 tokens.  
 • Maintain a neutral, facilitative tone.  
 Reminder: speak in the **first person**. Do **not** describe yourself or your previous responses.
 """
@@ -307,7 +309,7 @@ Debate topic: "{topic}".
 # REFLECTION ROUND - DO NOT INTRODUCE NEW ARGUMENTS
 # CHECK ALL HISTORY OF THE DEBATE AND YOUR BELIEFS
 
-Sections (≤ 2000 tokens total):
+Sections (≤ 700 tokens total):
 1. **Consistency Check** - Point out any contradiction in your own previous statements (≤ 40 tokens)
 2. **Strongest Point from the Other Side** - One sentence
 3. **Revised Position** - Update your position if needed (≤ 40 tokens)
@@ -333,7 +335,7 @@ You are {self.name}, acting as a {self.role} in a structured debate.
 # FINAL REPORT
 # BASED ON THE DEBATE HISTORY and YOU LAST REFLACTION ROUND
 
-Sections (≤ 3000 tokens total):
+Sections (≤ 1000 tokens total):
 1. **Core Stance** - State your final position clearly.
 2. **Key Evidence** - Max 3 bullets, strongest data-backed points.
 3. **Agreed Elements** - Max 3 bullets both sides accepted.
@@ -453,7 +455,7 @@ Reminder: speak in the **first person**. Do **not** describe yourself or your pr
         # Style rewriting prompt
         system_prompt_style = f"""
 You are a language expert tasked with refining written text for persona:{self.name}.
-Reminder: speak in the **first person**. Do **not** describe yourself or your previous responses as thrid person, adjust any thrid person of {self.name} to first person.
+Reminder: speak in the **first person**. Do **not** describe yourself or your previous responses as third person, adjust any thrid person of {self.name} to first person.
 
 
 ## Objective:
@@ -464,7 +466,7 @@ Create a more fluid text, without changing the meaning. Use a more natural langu
 - Remove all Markdown formatting, including headings, lists, and section titles. Convert all content to natural paragraphs.
 - If the input contains numbered sections, bullet points, or headings, merge and paraphrase them into flowing text.
 - Do not use any Markdown symbols (such as #, ##, -, *, 1., 2., etc.) in your output.
-- Use the following style: {style_instruction}
+- Always use the following style: {style_instruction}
 - Maintain the original meaning and structure.
 - Preserve all original ideas and logical flow
 - Add paragraph breaks when necessary and sentence tone.
@@ -475,6 +477,8 @@ Create a more fluid text, without changing the meaning. Use a more natural langu
 - Do **not** include any comments, summaries, or introductions.
 - Do **not** add new ideas or remove key content.
 - DO **not** use bullet points or lists.
+- Do **not** talk in third person about {self.name}.
+- Do **not** talk refer others as opponent, talk directly to him, use second person.
 
 ## Output:
 Only return the refined version of the input text. No explanations or notes.

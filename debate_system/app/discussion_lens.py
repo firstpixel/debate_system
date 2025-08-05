@@ -134,9 +134,9 @@ class DiscussionLens:
         """
         Return the theme for the given round.
         """
-        if round_number not in cls.AI_EDUCATION_LENSES:
+        if round_number not in cls.THEMES:
             return f"Free Round, no lens defined for round {round_number}."
-        return cls.AI_EDUCATION_LENSES[round_number]
+        return cls.THEMES[round_number]
 
 
 # # --- Usage Example ---
