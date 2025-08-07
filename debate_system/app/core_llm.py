@@ -12,55 +12,118 @@ class LLMClient:
         self.model = model
         self.temperature = temperature
         self.num_predict = num_predict
-        self.client = Client()
+        
+        try:
+            self.client = Client()
+            # Test connection
+            self.client.list()
+        except Exception as e:
+            logging.error(f"Failed to initialize Ollama client: {e}")
+            raise ConnectionError(f"Cannot connect to Ollama service. Please ensure Ollama is running. Error: {e}")
 
     def chat(self, messages: List[Dict]) -> str:
-        logging.debug(f"Initiating chat with model {self.model}")  # Use proper logging
-       
-        response = self.client.chat(
-            model=self.model,
-            messages=messages,
-            stream=False,
-            options={
-                "temperature": self.temperature,
-                "top_p": 0.9,
-                "frequency_penalty": 0.2,
-                "presence_penalty": 0.3,
-                "num_predict": self.num_predict,
-                # "num_gpu": 1,  # Ensure we use GPU
-                "num_ctx": 16384,
-                "mmap": True,  # Enable memory mapping for better performance
-            }
-        )
-        return response["message"]["content"]
+        """Send a chat request to the LLM.
+        
+        Args:
+            messages: List of message dictionaries
+            
+        Returns:
+            Response content as string
+            
+        Raises:
+            ConnectionError: If Ollama service is unavailable
+            ValueError: If model is not found
+            RuntimeError: If chat fails
+        """
+        logging.debug(f"Initiating chat with model {self.model}")
+        
+        try:
+            response = self.client.chat(
+                model=self.model,
+                messages=messages,
+                stream=False,
+                options={
+                    "temperature": self.temperature,
+                    "top_p": 0.9,
+                    "frequency_penalty": 0.2,
+                    "presence_penalty": 0.3,
+                    "num_predict": self.num_predict,
+                    "num_ctx": 16384,
+                    "mmap": True,
+                }
+            )
+            return response["message"]["content"]
+            
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "model" in error_msg and "not found" in error_msg:
+                raise ValueError(f"Model '{self.model}' not found. Run: ollama pull {self.model}")
+            elif "connection" in error_msg or "refused" in error_msg:
+                raise ConnectionError(f"Cannot connect to Ollama service: {e}")
+            else:
+                raise RuntimeError(f"Chat request failed: {e}")
 
     def stream_chat(self, messages: List[Dict]) -> Generator[str, None, None]:
-        logging.debug(f"Starting stream chat with model: {self.model}")  # Use proper logging
-        stream = self.client.chat(
-            model=self.model,
-            messages=messages,
-            stream=True,
-            options={
-                "temperature": self.temperature,
-                "top_p": 0.9,
-                "frequency_penalty": 0.1,
-                "presence_penalty": 0.2,
-                "num_predict": self.num_predict,
-                # "num_gpu": 1,  # Ensure we use GPU
-                # "num_ctx": 4096,
-                "mmap": True,  # Enable memory mapping for better performance
-            }
-        )
-        for part in stream:
-            yield part["message"]["content"]
+        """Send a streaming chat request to the LLM.
+        
+        Args:
+            messages: List of message dictionaries
+            
+        Yields:
+            Response chunks as strings
+            
+        Raises:
+            ConnectionError: If Ollama service is unavailable  
+            ValueError: If model is not found
+            RuntimeError: If streaming fails
+        """
+        logging.debug(f"Starting stream chat with model: {self.model}")
+        
+        try:
+            stream = self.client.chat(
+                model=self.model,
+                messages=messages,
+                stream=True,
+                options={
+                    "temperature": self.temperature,
+                    "top_p": 0.9,
+                    "frequency_penalty": 0.1,
+                    "presence_penalty": 0.2,
+                    "num_predict": self.num_predict,
+                    "num_ctx": 16384,
+                    "mmap": True,
+                }
+            )
+
+            for chunk in stream:
+                if chunk.get("message", {}).get("content"):
+                    yield chunk["message"]["content"]
+                    
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "model" in error_msg and "not found" in error_msg:
+                raise ValueError(f"Model '{self.model}' not found. Run: ollama pull {self.model}")
+            elif "connection" in error_msg or "refused" in error_msg:
+                raise ConnectionError(f"Cannot connect to Ollama service: {e}")
+            else:
+                raise RuntimeError(f"Streaming chat failed: {e}")
 
     def embed(self, text: str) -> List[float]:
-            print(f"###########Embedding with model: {text}") 
+        """Generate embeddings for the given text.
+        
+        Args:
+            text: Text to embed
+            
+        Returns:
+            List of embedding values
+        """
+        logging.debug(f"Generating embeddings for text: {text[:50]}...")
+        try:
             result = self.client.embeddings(
                 model="nomic-embed-text:latest",
                 prompt=text,
-                # options={
-                #     "num_gpu": 1  # Ensure embeddings also use GPU
-                # }
             )
             return result["embedding"]
+        except Exception as e:
+            logging.error(f"Embedding generation failed: {e}")
+            raise RuntimeError(f"Failed to generate embeddings: {e}")
