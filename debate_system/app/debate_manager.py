@@ -1,6 +1,7 @@
 # app/debate_manager.py
 
 import re
+import logging
 from typing import Any, Callable, Dict, List, Optional
 import uuid
 from app.persona_agent import PersonaAgent
@@ -17,6 +18,8 @@ from app.delphi_engine import DelphiEngine
 from app.mediator_agent import MediatorAgent
 from app.contradiction_detector import ContradictionDetector
 from app.discussion_lens import DiscussionLens
+
+logger = logging.getLogger(__name__)
 
 class DebateManager:
     def __init__(self, config: dict):
@@ -104,11 +107,16 @@ class DebateManager:
         return prompt
 
     def start(self, feedback_callback: Optional[Callable[[str], None]] = None):
+        logger.info("DebateManager started")
+        logger.debug(f"Config: {self.config}")
+        logger.info(f"Session ID: {self.session_id}")
+        
         print("DebateManager started with config:")
         print(self.config)
         print("Session ID:", self.session_id)
 
         rounds = self.config.get("rounds", 3)
+        logger.info(f"Total rounds configured: {rounds}")
         print(f"Total rounds configured: {rounds}")
 
 
@@ -124,8 +132,10 @@ class DebateManager:
             is_final = round_num >= merged_round
             sub_round_type = "REFLECTION" if is_reflection else "SUMMARY" if is_summary else "NORMAL"
             
+            logger.info(f"Starting Round {round_num + 1}/{rounds} ({sub_round_type})")
             print(f"\n🔁 Starting Round {round_num + 1} / {rounds} ({sub_round_type})")
 
+            logger.info(f"Beginning Round {round_num + 1}/{rounds}")
             print(f"\n🔁 Round {round_num + 1} / {rounds}")
             if feedback_callback:
                 feedback_callback("Round_Marker", f"## 🔁 Round {round_num + 1} / {rounds}", round_num + 1, 1)
@@ -266,6 +276,7 @@ class DebateManager:
                     
                     # If intervention is needed, call the mediator
                     if should_intervene:
+                        logger.info(f"Mediator intervening: {intervention_reason}")
                         print(f"\n🧑‍⚖️ Mediator intervening: {intervention_reason} ----------------------------")
                         mediator_response = self.mediator.generate_response(
                             round_history=self.debate_history,
