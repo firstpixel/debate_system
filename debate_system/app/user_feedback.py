@@ -1,8 +1,10 @@
 # app/user_feedback.py
 
 import json
+import logging
 import os
 
+logger = logging.getLogger(__name__)
 SESSION_DIR = "sessions"
 
 def get_feedback_form() -> dict:
@@ -21,4 +23,5 @@ def save_feedback(session_id: str, feedback: dict):
     with open(path, "w") as f:
         json.dump(feedback, f, indent=2)
 
+    logger.info(f"Feedback saved for session {session_id}")
     print(f"📝 Feedback saved to {path}")

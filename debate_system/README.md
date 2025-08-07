@@ -57,7 +57,21 @@ debate_system/
 
 ## ⚙️ Setup
 
-### Prerequisites
+### Quick Start
+
+1. **Validate your environment:**
+```bash
+python setup_validator.py
+```
+
+2. **Or use the development setup script:**
+```bash
+python dev_setup.py
+```
+
+### Manual Setup
+
+#### Prerequisites
 
 1. **Ollama**: Install [Ollama](https://ollama.com) and pull the required model:
 
@@ -81,8 +95,59 @@ Create and activate your Python environment:
 ```bash
 python3 -m venv venv
 source venv/bin/activate
+
+# Option 1: Core dependencies only (recommended)
+pip install -r requirements-core.txt
+
+# Option 2: Full dependencies (if needed)
 pip install -r requirements.txt
 ```
+
+---
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+**Installation timeouts:**
+```bash
+# Use core requirements for faster install
+pip install -r requirements-core.txt
+```
+
+**Ollama connection errors:**
+```bash
+# Check if Ollama is running
+ollama list
+
+# Start Ollama service if needed
+ollama serve
+```
+
+**Missing dependencies:**
+```bash
+# Run environment validation
+python setup_validator.py
+
+# Use development setup
+python dev_setup.py
+```
+
+**MongoDB/Qdrant connection issues:**
+```bash
+# Start Docker services
+docker-compose up -d
+
+# Check service status
+docker-compose ps
+```
+
+### Performance Tips
+
+- Use `requirements-core.txt` for minimal installation
+- Ensure Ollama model is downloaded: `ollama pull gemma3:latest`
+- Increase Docker memory allocation for better performance
+- Use GPU acceleration if available
 
 ---
 

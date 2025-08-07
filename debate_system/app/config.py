@@ -81,16 +81,82 @@ def normalize_config(user_cfg: dict) -> dict:
     return cfg
 
 def load_config(file_path: str) -> dict:
-    ext = os.path.splitext(file_path)[-1]
+    """Load and validate configuration file.
+    
+    Args:
+        file_path: Path to configuration file
+        
+    Returns:
+        Normalized configuration dictionary
+        
+    Raises:
+        ValueError: If configuration format is unsupported or invalid
+        FileNotFoundError: If configuration file doesn't exist
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Configuration file not found: {file_path}")
+    
+    ext = os.path.splitext(file_path)[-1].lower()
 
-    if ext in [".yaml", ".yml"]:
-        user_cfg = _load_yaml(file_path)
-    elif ext == ".json":
-        user_cfg = _load_json(file_path)
-    elif ext == ".md":
-        user_cfg = _load_markdown_frontmatter(file_path)
-    else:
-        raise ValueError(f"Unsupported config format: {ext}")
+    try:
+        if ext in [".yaml", ".yml"]:
+            user_cfg = _load_yaml(file_path)
+        elif ext == ".json":
+            user_cfg = _load_json(file_path)
+        elif ext == ".md":
+            user_cfg = _load_markdown_frontmatter(file_path)
+        else:
+            raise ValueError(f"Unsupported config format: {ext}. Supported formats: .yaml, .yml, .json, .md")
+    except Exception as e:
+        raise ValueError(f"Failed to parse configuration file {file_path}: {str(e)}")
 
     cfg = normalize_config(user_cfg)
+    
+    # Validate essential configuration
+    _validate_config(cfg)
+    
     return cfg
+
+def _validate_config(config: dict) -> None:
+    """Validate essential configuration parameters.
+    
+    Args:
+        config: Configuration dictionary to validate
+        
+    Raises:
+        ValueError: If configuration is invalid
+    """
+    # Check required fields
+    required_fields = ["personas", "rounds"]
+    missing_fields = [field for field in required_fields if field not in config or not config[field]]
+    
+    if missing_fields:
+        raise ValueError(f"Missing required configuration fields: {missing_fields}")
+    
+    # Validate personas
+    if not isinstance(config["personas"], list) or len(config["personas"]) == 0:
+        raise ValueError("Configuration must include at least one persona")
+    
+    for i, persona in enumerate(config["personas"]):
+        if not isinstance(persona, dict):
+            raise ValueError(f"Persona {i} must be a dictionary")
+        
+        required_persona_fields = ["name", "role"]
+        missing_persona_fields = [field for field in required_persona_fields if field not in persona]
+        
+        if missing_persona_fields:
+            raise ValueError(f"Persona {i} missing required fields: {missing_persona_fields}")
+    
+    # Validate rounds
+    if not isinstance(config["rounds"], int) or config["rounds"] < 1:
+        raise ValueError("Rounds must be a positive integer")
+    
+    # Validate language if specified
+    supported_languages = ["english", "spanish", "french", "german", "portuguese"]
+    if config.get("language") and config["language"].lower() not in supported_languages:
+        print(f"Warning: Language '{config['language']}' not in supported list: {supported_languages}")
+    
+    # Validate turn strategy
+    supported_strategies = ["round_robin", "priority", "interrupt", "delphi"]
+    if config.get("turn_strategy") and config["turn_strategy"] not in supported_strategies:
+        raise ValueError(f"Unsupported turn strategy: {config['turn_strategy']}. Supported: {supported_strategies}")

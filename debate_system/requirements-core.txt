@@ -1,0 +1,36 @@
+# Core dependencies for the debate system
+# This is a minimal set of required packages
+
+# LLM and AI
+ollama==0.4.8
+transformers==4.51.3
+torch==2.7.0
+
+# Data handling
+numpy==2.2.5
+pandas==2.2.3
+
+# Database and storage
+pymongo==4.12.1
+qdrant-client==1.14.2
+
+# Configuration and utilities
+PyYAML==6.0.2
+pydantic==2.11.4
+python-dotenv==1.1.0
+
+# UI
+streamlit==1.45.0
+
+# Networking
+httpx==0.28.1
+requests==2.32.3
+
+# Testing
+pytest==8.3.5
+
+# Graph processing
+networkx==3.4.2
+
+# Document processing (optional)
+# docling==2.34.0  # Uncomment if document processing is needed

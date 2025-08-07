@@ -15,7 +15,7 @@ class LLMClient:
         self.client = Client()
 
     def chat(self, messages: List[Dict]) -> str:
-        print(f"###########Chatting with model {messages}...") # Use the logger instance
+        logging.debug(f"Initiating chat with model {self.model}")  # Use proper logging
        
         response = self.client.chat(
             model=self.model,
@@ -35,7 +35,7 @@ class LLMClient:
         return response["message"]["content"]
 
     def stream_chat(self, messages: List[Dict]) -> Generator[str, None, None]:
-        print(f"###########Streaming chat with model: {messages}") # Use the logger instance
+        logging.debug(f"Starting stream chat with model: {self.model}")  # Use proper logging
         stream = self.client.chat(
             model=self.model,
             messages=messages,
