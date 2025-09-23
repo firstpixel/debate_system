@@ -120,3 +120,16 @@ class BeliefStore:
         if not doc or "contradictions" not in doc:
             return ""
         return "\n".join(f"- {c}" for c in doc["contradictions"])
+
+    def get_belief_summary(self, agent_id: str) -> Dict:
+        """Return stored scores and metadata for an agent belief."""
+        doc = self.collection.find_one({"agent_id": agent_id})
+        if not doc:
+            return {}
+        result = {
+            "topic": doc.get("topic"),
+            "round": doc.get("round"),
+            "summary": doc.get("summary"),
+        }
+        result.update(doc.get("scores", {}))
+        return result

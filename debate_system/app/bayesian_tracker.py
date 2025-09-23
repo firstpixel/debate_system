@@ -67,7 +67,27 @@ class BayesianTracker:
                 similarity_scores=[0.85] * len(contradiction_data["contradicted"])
             )
 
+        # Store coherence for quick lookup
         self.coherence_scores[agent] = analysis["coherence"]
+
+        # --------------------------------------------------
+        # Save belief with semantic scores to agent memory
+        # --------------------------------------------------
+        belief_data = {
+            "belief": message,
+            "scores": {
+                "coherence": analysis.get("coherence"),
+                "drift": analysis.get("drift"),
+            },
+            "topic": topic,
+            "round": len(self.agent_history.get(agent, [])),
+        }
+        tracker = self.trackers.get(agent)
+        if tracker:
+            try:
+                tracker.memory.save_belief(agent_id=agent, belief_data=belief_data)
+            except Exception as e:
+                logger.error(f"Failed saving belief for {agent}: {e}")
 
         return {
             **analysis,
