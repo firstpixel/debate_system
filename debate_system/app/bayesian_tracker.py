@@ -59,6 +59,27 @@ class BayesianTracker:
         analysis = self._analyze_semantics(agent)
         contradiction_data = self._detect_contradiction(agent)
 
+        # Build belief data with semantic scores and metadata
+        belief_data = {
+            "belief": message,
+            "scores": {
+                "coherence": analysis.get("coherence", 1.0),
+                "drift": analysis.get("drift", 0.0),
+            },
+            "topic": topic,
+            "round": len(self.agent_history.get(agent, [])),
+        }
+
+        # Persist belief information if a tracker exists for this agent
+        try:
+            if agent in self.trackers:
+                self.trackers[agent].memory.save_belief(
+                    agent_id=agent,
+                    belief_data=belief_data,
+                )
+        except Exception as e:
+            logger.error(f"Failed to save belief for {agent}: {e}")
+
         if contradiction_data["contradicted"]:
             self.contradiction_log.log(
                 agent=agent,
@@ -130,6 +151,19 @@ class BayesianTracker:
         except Exception as e:
             logger.error(f"Failed to get belief summary for {agent}: {e}")
             return {}
+
+    def analyze(self, agent: str, topic: str) -> Dict:
+        """Return the semantic analysis for the agent without recording a new turn."""
+        if self.topic_embedding is None:
+            self.topic_embedding = self._get_embedding(topic)
+
+        analysis = self._analyze_semantics(agent)
+        contradiction_data = self._detect_contradiction(agent)
+
+        return {
+            **analysis,
+            "contradicted_beliefs": contradiction_data["contradicted"],
+        }
 
     def export_logs(self) -> str:
         return self.contradiction_log.to_markdown()
