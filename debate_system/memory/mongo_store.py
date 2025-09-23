@@ -120,3 +120,26 @@ class BeliefStore:
         if not doc or "contradictions" not in doc:
             return ""
         return "\n".join(f"- {c}" for c in doc["contradictions"])
+
+    def get_belief_summary(self, agent_id: str, return_type: str = "dict"):
+        """Return belief summary with optional scores and metadata."""
+        doc = self.collection.find_one({"agent_id": agent_id})
+        if not doc:
+            return {} if return_type == "dict" else ""
+
+        summary = doc.get("summary", "")
+        scores = doc.get("scores", {})
+        metadata = {
+            "topic": doc.get("topic"),
+            "round": doc.get("round"),
+        }
+
+        if return_type == "dict":
+            return {"summary": summary, "scores": scores, **metadata}
+
+        score_lines = ", ".join(f"{k}: {v}" for k, v in scores.items())
+        meta_lines = ", ".join(
+            f"{k}: {v}" for k, v in metadata.items() if v is not None
+        )
+        extras = ", ".join(filter(None, [score_lines, meta_lines]))
+        return f"{summary}\n{extras}".strip() if extras else summary
