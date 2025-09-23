@@ -59,6 +59,24 @@ class BayesianTracker:
         analysis = self._analyze_semantics(agent)
         contradiction_data = self._detect_contradiction(agent)
 
+        # Build belief data with semantic scores and metadata
+        belief_data = {
+            "belief": message,
+            "scores": {
+                "coherence": analysis.get("coherence", 1.0),
+                "drift": analysis.get("drift", 0.0),
+            },
+            "topic": topic,
+            "round": self.trackers.get(agent).get_total_rounds() if agent in self.trackers else None,
+        }
+
+        # Persist belief information with scores
+        if agent in self.trackers:
+            try:
+                self.trackers[agent].memory.save_belief(agent_id=agent, belief_data=belief_data)
+            except Exception as e:
+                logger.error(f"Failed to save belief data for {agent}: {e}")
+
         if contradiction_data["contradicted"]:
             self.contradiction_log.log(
                 agent=agent,
@@ -126,7 +144,14 @@ class BayesianTracker:
     def get_agent_scores(self, agent: str) -> Dict:
         try:
             tracker = self.trackers[agent]
-            return tracker.memory.get_belief_summary(agent, return_type="dict")
+            memory = tracker.memory
+            if hasattr(memory, "get_belief_summary"):
+                summary = memory.get_belief_summary(agent, return_type="dict")
+            else:
+                summary = None
+            if not isinstance(summary, dict) and hasattr(memory, "belief") and hasattr(memory.belief, "get_belief_summary"):
+                summary = memory.belief.get_belief_summary(agent, return_type="dict")
+            return summary or {}
         except Exception as e:
             logger.error(f"Failed to get belief summary for {agent}: {e}")
             return {}
