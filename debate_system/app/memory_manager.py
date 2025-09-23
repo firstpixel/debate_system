@@ -98,6 +98,10 @@ class MemoryManager:
         # Return the string directly - it's already formatted
         return contradictions_str
 
+    def get_belief_summary(self, agent_id: str, return_type: str = "dict"):
+        """Wrapper to fetch belief summary with scores."""
+        return self.belief.get_belief_summary(agent_id, return_type)
+
     # ---------------------------------------------
     # LTM and RAG retrieval
     # ---------------------------------------------

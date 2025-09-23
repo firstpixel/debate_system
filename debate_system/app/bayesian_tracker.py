@@ -57,6 +57,23 @@ class BayesianTracker:
             self.topic_embedding = self._get_embedding(topic)
 
         analysis = self._analyze_semantics(agent)
+
+        belief_data = {
+            "belief": message,
+            "scores": {
+                "coherence": analysis.get("coherence"),
+                "drift": analysis.get("drift"),
+            },
+            "topic": topic,
+            "round": len(self.agent_history.get(agent, [])),
+        }
+
+        if agent in self.trackers:
+            try:
+                self.trackers[agent].memory.save_belief(agent_id=agent, belief_data=belief_data)
+            except Exception as e:
+                logger.error(f"Failed to save belief for {agent}: {e}")
+
         contradiction_data = self._detect_contradiction(agent)
 
         if contradiction_data["contradicted"]:
