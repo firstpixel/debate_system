@@ -98,6 +98,32 @@ class MemoryManager:
         # Return the string directly - it's already formatted
         return contradictions_str
 
+    def get_belief_summary(self, agent_id: str, return_type: str = "str"):
+        """Retrieve belief summary and associated coherence/drift scores."""
+        doc = self.belief.collection.find_one({"agent_id": agent_id})
+        if not doc:
+            return {} if return_type == "dict" else ""
+
+        scores = doc.get("scores", {})
+        coherence = float(scores.get("coherence", 1.0))
+        drift = float(scores.get("drift", 0.0))
+        contradiction = bool(doc.get("contradictions"))
+
+        if return_type == "dict":
+            return {
+                "coherence": coherence,
+                "drift": drift,
+                "contradiction": contradiction,
+                "summary": doc.get("summary", ""),
+            }
+
+        summary_lines = [doc.get("summary", "").strip()]
+        summary_lines.append(f"Coherence: {coherence:.2f}")
+        summary_lines.append(f"Drift: {drift:.2f}")
+        if contradiction:
+            summary_lines.append("Possible contradictions detected.")
+        return "\n".join(line for line in summary_lines if line)
+
     # ---------------------------------------------
     # LTM and RAG retrieval
     # ---------------------------------------------
